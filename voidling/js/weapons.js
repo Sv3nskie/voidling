@@ -6,8 +6,28 @@
     blaster: { name: 'STAR BLASTER', ammo: 18, cd: 0.14, recoil: 200, color: '#ffd86b' },
     spread: { name: 'SPREAD GUN', ammo: 10, cd: 0.32, recoil: 260, color: '#ff7fc8' },
   };
-  const THROWN = { rock: { name: 'ROCK' }, bomb: { name: 'VOID BOMB' } };
+  const THROWN = { rock: { name: 'STONE' }, bomb: { name: 'VOID BOMB' } };
   V.GUNS = GUNS;
+  // Inventory: you carry all of these at once; Shift uses the selected one (P.sel)
+  const ORDER = ['blaster', 'spread', 'rock', 'bomb'];
+  const CAP = (V.CAP = { blaster: 60, spread: 40, rock: 9, bomb: 5 }); // most you can carry
+  const ADD = { blaster: 18, spread: 10, rock: 1, bomb: 1 };           // one pickup gives
+  // What Shift uses right now: { type, ammo } or null
+  G.held = () => {
+    const P = G.P, t = P.sel;
+    return t && P.bag[t] > 0 ? { type: t, ammo: P.bag[t] } : null;
+  };
+  const ensureSelection = () => {
+    const P = G.P;
+    if (!P.sel || !P.bag[P.sel]) P.sel = ORDER.find(t => P.bag[t] > 0) || null;
+  };
+  G.selectNext = (dir = 1) => {
+    const P = G.P, owned = ORDER.filter(t => P.bag[t] > 0);
+    if (!owned.length) return;
+    const i = owned.indexOf(P.sel);
+    P.sel = owned[((i < 0 ? 0 : i + dir) % owned.length + owned.length) % owned.length];
+    V.sfx.hit();
+  };
   const THROW_SPEED = 560, THROW_G = 1100, BOMB_R = 90;
   const FONT_D = '"Bungee", "Arial Black", sans-serif';
   const FONT_B = '"Fredoka", "Trebuchet MS", sans-serif';
@@ -55,7 +75,7 @@
   // mode: 'mouse' aims at the cursor; anything else is keyboard / gamepad / touch:
   // right stick > held ↑/↓ > auto-aim target > straight ahead
   function aimDir(mode) {
-    const P = G.P, I = V.input, thrown = P.held && THROWN[P.held.type];
+    const P = G.P, I = V.input, held = G.held(), thrown = held && THROWN[held.type];
     if (mode === 'mouse') {
       const cam = G.cam, z = cam.zoom;
       return norm((G.aim.sx - G.W / 2) / z + cam.x - P.x, (G.aim.sy - G.H / 2) / z + cam.y - P.y);
@@ -81,16 +101,20 @@
     const src = I.down('click') ? 'mouse' : I.down('shoot') || I.down('tshoot') ? 'key' : null;
     if (src) G.aim.mode = src;
     if (V.pad.aiming) G.aim.mode = 'key';
-    if (src && P.held && P.fireCd <= 0) {
-      const gun = GUNS[P.held.type];
-      if (gun) fireGun(gun, aimDir(src));
-      else if (I.hit('click') || I.hit('shoot') || I.hit('tshoot')) throwHeld(aimDir(src));
+    // Switching: R / Tab cycles, 1-4 picks a slot (mouse wheel and tapping the bar: see below)
+    if (I.hit('cycle')) G.selectNext(1);
+    ORDER.forEach((t, i) => { if (I.hit('slot' + (i + 1)) && P.bag[t] > 0) { P.sel = t; V.sfx.hit(); } });
+    const held = G.held();
+    if (src && held && P.fireCd <= 0) {
+      const gun = GUNS[held.type];
+      if (gun) fireGun(gun, aimDir(src), held.type);
+      else if (I.hit('click') || I.hit('shoot') || I.hit('tshoot')) throwHeld(aimDir(src), held.type);
     }
     updateShots(dt);
   };
-  function fireGun(gun, [dx, dy]) {
+  function fireGun(gun, [dx, dy], type) {
     const P = G.P, base = Math.atan2(dy, dx);
-    for (const off of P.held.type === 'spread' ? [-0.22, 0, 0.22] : [0]) {
+    for (const off of type === 'spread' ? [-0.22, 0, 0.22] : [0]) {
       const a = base + off;
       G.shots.push({ kind: 'bolt', x: P.x + Math.cos(a) * 16, y: P.y + Math.sin(a) * 16, vx: Math.cos(a) * 780, vy: Math.sin(a) * 780, a: 5, life: 0.8, color: gun.color });
     }
@@ -99,15 +123,17 @@
     // Shooting straight down in the air kicks you upward
     if (dy > 0.7 && !P.onGround) { P.vy = Math.min(P.vy, -gun.recoil); G.guide.event('recoil'); }
     P.mouth = 0.6;
-    (P.held.type === 'spread' ? V.sfx.spread : V.sfx.shoot)();
+    (type === 'spread' ? V.sfx.spread : V.sfx.shoot)();
     G.tower.burst(P.x + dx * 18, P.y + dy * 18, 4, gun.color, 3, 90);
     G.guide.event('shoot');
-    if (--P.held.ammo <= 0) { G.tower.popup(P.x, P.y - 34, 'OUT OF AMMO', '#b9a6d9'); P.held = null; }
+    if (--P.bag[type] <= 0) { G.tower.popup(P.x, P.y - 34, `${gun.name} EMPTY`, '#b9a6d9'); ensureSelection(); }
   }
-  function throwHeld([dx, dy]) {
-    const P = G.P, type = P.held.type;
+  function throwHeld([dx, dy], type) {
+    const P = G.P;
     G.shots.push({ kind: type, x: P.x, y: P.y - 18, vx: dx * THROW_SPEED + P.vx * 0.3, vy: dy * THROW_SPEED + Math.min(0, P.vy) * 0.2, a: type === 'bomb' ? 9 : 8, life: type === 'bomb' ? 1.4 : 3, spin: 0 });
-    P.held = null; P.fireCd = 0.25;
+    P.bag[type]--;
+    ensureSelection();
+    P.fireCd = 0.25;
     if (Math.abs(dx) > 0.2) P.face = Math.sign(dx);
     V.sfx.throw();
     G.guide.event('throw');
@@ -192,21 +218,39 @@
     G.blasts = G.blasts.filter(b => b.t < 0.45);
   }
 
-  // Walking over an item picks it up. Guns always fit; rocks and bombs need empty hands.
+  // Walking over an item adds it to your inventory: guns add shots, stones and bombs stack.
+  // If you can't carry more of it, it stays where it is.
   G.tryPickup = it => {
-    const P = G.P, T = G.tower, gun = GUNS[it.type];
-    if (!gun && P.held) return false;
-    if (gun && P.held && P.held.type === it.type) P.held.ammo += gun.ammo;
-    else {
-      if (P.held && THROWN[P.held.type]) T.addItem(P.held.type, it.x, it.y);
-      P.held = { type: it.type, ammo: gun ? gun.ammo : 1 };
+    const P = G.P, T = G.tower, t = it.type, gun = GUNS[t];
+    if (P.bag[t] >= CAP[t]) {
+      G.once('full-' + t, () => T.popup(it.x, it.y - 20, `${gun ? gun.name : THROWN[t].name} FULL`, '#b9a6d9'));
+      return false;
     }
+    P.bag[t] = Math.min(CAP[t], P.bag[t] + ADD[t]);
+    // Select it if nothing usable is selected, or it's a gun and you were holding a stone/bomb
+    if (!G.held() || (gun && !GUNS[P.sel])) P.sel = t;
     it.dead = true;
     V.sfx.pickup();
-    T.popup(it.x, it.y - 20, gun ? gun.name : THROWN[it.type].name, gun ? gun.color : '#e6d6ff');
+    T.popup(it.x, it.y - 20, gun ? `${gun.name} +${ADD[t]} SHOTS` : `${THROWN[t].name} ${P.bag[t]}/${CAP[t]}`, gun ? gun.color : '#e6d6ff');
     G.guide.event('pickup');
+    if (ORDER.filter(k => P.bag[k] > 0).length > 1) G.guide.show('switch', 'You carry several things now. Press [R] to switch, [SHIFT] to use.');
     return true;
   };
+  // Mouse wheel switches; clicking or tapping a slot in the item bar selects it
+  G.canvas.addEventListener('wheel', e => {
+    if (G.state !== 'play') return;
+    e.preventDefault();
+    G.selectNext(e.deltaY > 0 ? 1 : -1);
+  }, { passive: false });
+  G.canvas.addEventListener('pointerdown', e => {
+    if (G.state !== 'play' || !G.invRects) return;
+    const x = e.clientX / G.ui, y = e.clientY / G.ui;
+    const hit = G.invRects.find(r => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+    if (!hit) return;
+    G.P.sel = hit.t;
+    V.sfx.hit();
+    e.stopImmediatePropagation(); // don't also shoot
+  }, { capture: true }); // capture: runs before the click-to-shoot handler
 
   // ---------- Drawing ----------
   function drawRock(ctx, x, y, s, rot) {
@@ -263,8 +307,8 @@
   // What the Voidling is holding, plus a dotted arc showing where a throw will land and a
   // lock-on marker on the auto-aim target
   G.drawHeld = ctx => {
-    const P = G.P;
-    if (!P.held || G.state === 'dead') return;
+    const P = G.P, held = G.held();
+    if (!held || G.state === 'dead') return;
     const [dx, dy] = aimDir(G.aim.mode);
     const target = G.aim.mode !== 'mouse' && !V.pad.aiming && !V.input.down('up') && !(V.input.down('down') && !P.onGround) ? G.autoTarget() : null;
     if (target) {
@@ -277,12 +321,12 @@
       ctx.fillStyle = '#ffd86b';
       ctx.beginPath(); ctx.arc(ex, ey, 2.5, 0, TAU); ctx.fill();
     }
-    if (GUNS[P.held.type]) {
-      drawGun(ctx, P.x + dx * 14, P.y + dy * 14 + 3, Math.atan2(dy, dx), dx < 0 ? -1 : 1, P.held.type);
+    if (GUNS[held.type]) {
+      drawGun(ctx, P.x + dx * 14, P.y + dy * 14 + 3, Math.atan2(dy, dx), dx < 0 ? -1 : 1, held.type);
       return;
     }
     const hy = P.y - P.r * 1.75 + Math.sin(G.t * 4) * 1.5;
-    if (P.held.type === 'rock') drawRock(ctx, P.x, hy, 8, 0);
+    if (held.type === 'rock') drawRock(ctx, P.x, hy, 8, 0);
     else drawBomb(ctx, P.x, hy, 9, G.t);
     let x = P.x, y = P.y - 18, vx = dx * THROW_SPEED + P.vx * 0.3, vy = dy * THROW_SPEED + Math.min(0, P.vy) * 0.2;
     ctx.fillStyle = '#e6d6ff';
@@ -314,26 +358,38 @@
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.3 + k * 0.9), 0, TAU); ctx.stroke();
     }
   };
-  // Bottom-left card: what you hold and how many shots are left
+  // Bottom-left item bar: everything you carry with its count; the selected one (used by
+  // Shift) is outlined in gold. Click or tap a slot to select it.
   G.drawHeldHud = ctx => {
-    const P = G.P;
-    if (!P.held) return;
-    const W = G.HW, H = G.HH, gun = GUNS[P.held.type];
-    const x = 18, y = (W < 760 ? H - 100 : H - 58) - Math.max(G.reserve, G.reserveLeft || 0), w = 236, h = 40;
-    ctx.fillStyle = 'rgba(11,5,24,0.8)';
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 12); ctx.fill();
-    ctx.strokeStyle = gun ? gun.color : '#e6d6ff'; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.save();
-    ctx.translate(x + 24, y + h / 2); ctx.scale(1.4, 1.4);
-    if (gun) drawGun(ctx, 0, 0, 0, 1, P.held.type);
-    else if (P.held.type === 'rock') drawRock(ctx, 0, 0, 8, 0);
-    else drawBomb(ctx, 0, 0, 8, G.t);
-    ctx.restore();
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillStyle = gun ? gun.color : '#f4eaff'; ctx.font = `12px ${FONT_D}`;
-    ctx.fillText(gun ? `${gun.name}  ×${P.held.ammo}` : THROWN[P.held.type].name, x + 50, y + 7);
-    ctx.fillStyle = '#b9a6d9'; ctx.font = `500 12px ${FONT_B}`;
-    ctx.fillText(G.isTouch() ? (gun ? 'SHOOT auto-aims' : 'SHOOT auto-aims the throw')
-      : gun ? 'SHIFT auto-aims · hold ↑/↓ to aim' : 'SHIFT auto-aims the throw · or click', x + 50, y + 22);
+    const P = G.P, owned = ORDER.filter(t => P.bag[t] > 0);
+    G.invRects = [];
+    if (!owned.length) return;
+    const W = G.HW, H = G.HH, slot = 54, h = 46, gap = 6, x0 = 18;
+    const y = (W < 760 ? H - 104 : H - 62) - Math.max(G.reserve, G.reserveLeft || 0);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#b9a6d9'; ctx.font = `500 11px ${FONT_B}`;
+    ctx.fillText(G.isTouch() ? 'SHOOT uses it · tap to switch' : 'SHIFT uses it · R, 1-4 or wheel to switch', x0, y - 4);
+    owned.forEach((t, i) => {
+      const x = x0 + i * (slot + gap), sel = t === P.sel, gun = GUNS[t];
+      ctx.fillStyle = 'rgba(11,5,24,0.82)';
+      ctx.beginPath(); ctx.roundRect(x, y, slot, h, 10); ctx.fill();
+      ctx.strokeStyle = sel ? '#ffcc4d' : 'rgba(185,140,255,0.4)'; ctx.lineWidth = sel ? 2.5 : 1.5;
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(x + slot / 2, y + 17);
+      ctx.scale(1.25, 1.25);
+      if (gun) drawGun(ctx, 0, 0, 0, 1, t);
+      else if (t === 'rock') drawRock(ctx, 0, 0, 8, 0);
+      else drawBomb(ctx, 0, 1, 7, G.t);
+      ctx.restore();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = sel ? '#ffcc4d' : '#f4eaff'; ctx.font = `11px ${FONT_D}`;
+      ctx.fillText(String(P.bag[t]), x + slot / 2, y + h - 6);
+      if (!G.isTouch()) {
+        ctx.fillStyle = '#7a6a98'; ctx.font = `500 10px ${FONT_B}`; ctx.textAlign = 'left';
+        ctx.fillText(String(ORDER.indexOf(t) + 1), x + 5, y + 12);
+      }
+      G.invRects.push({ t, x, y, w: slot, h });
+    });
   };
 })();

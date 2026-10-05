@@ -1,7 +1,7 @@
 // Voidling core: math helpers, input, audio, glow sprites
 (() => {
   const V = (window.V = window.V || {});
-  V.VERSION = '0.1.4'; // shown on the title screen, so bug reports can say which build
+  V.VERSION = '0.1.5'; // shown on the title screen, so bug reports can say which build
 
   // The tower swaps V.random for its own seeded generator while it builds levels
   V.random = Math.random;
@@ -44,6 +44,7 @@
     ShiftLeft: 'shoot', ShiftRight: 'shoot', KeyE: 'shoot',
     KeyX: 'chomp', KeyC: 'chomp', KeyK: 'chomp',
     KeyG: 'hook', KeyQ: 'hook',
+    KeyR: 'cycle', Tab: 'cycle', Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4',
     KeyM: 'mute', KeyP: 'pause', Escape: 'pause', Enter: 'start',
   };
   const actions = code => [].concat(MAP[code] || []);
@@ -57,9 +58,9 @@
   addEventListener('keyup', e => actions(e.code).forEach(a => keys.delete(a)));
   addEventListener('blur', () => keys.clear());
   // ---------- Gamepad (standard layout: Xbox / PlayStation / Steam Deck) ----------
-  // Left stick or d-pad moves, A jumps, B dashes, X or RT shoots, Y / LB / LT grapples,
+  // Left stick or d-pad moves, A jumps, B dashes, X or RT shoots, RB switches item, Y / LB / LT grapples,
   // Start pauses, and the right stick aims in any direction.
-  const PAD = { 0: 'jump', 1: 'chomp', 2: 'shoot', 7: 'shoot', 5: 'chomp', 3: 'hook', 4: 'hook', 6: 'hook', 9: ['start', 'pause'], 12: 'up', 13: 'down', 14: 'left', 15: 'right' };
+  const PAD = { 0: 'jump', 1: 'chomp', 2: 'shoot', 7: 'shoot', 5: 'cycle', 3: 'hook', 4: 'hook', 6: 'hook', 9: ['start', 'pause'], 12: 'up', 13: 'down', 14: 'left', 15: 'right' };
   const padHeld = new Set();
   V.pad = { ax: 0, ay: 0, aiming: false, connected: false };
   V.pollPad = () => {

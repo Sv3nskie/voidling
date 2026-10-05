@@ -59,7 +59,8 @@
     dashT: 0, dashCd: 0, face: 1, inv: 0, mouth: 0, squash: 0, lookX: 1, lookY: 0, gliding: false,
     // best = highest point this run (the score); peak = highest point since the last respawn
     // (what the Void measures against); diamonds = revives, max 3
-    hearts: 3, maxHearts: 5, best: 0, peak: 0, diamonds: 0, coins: 0, kills: 0, time: 0, zone: 0, trail: [], held: null, fireCd: 0,
+    hearts: 3, maxHearts: 5, best: 0, peak: 0, diamonds: 0, coins: 0, kills: 0, time: 0, zone: 0, trail: [], fireCd: 0,
+    bag: { blaster: 0, spread: 0, rock: 0, bomb: 0 }, sel: null, // inventory and the selected item
     buffs: { shield: 0, boots: 0, wings: 0, freeze: 0 }, hooks: 0, hook: null, rescue: null,
   });
 
@@ -89,7 +90,7 @@
     else { G.tower.reset(); G.tower.init(G.ppu()); }
     G.P = Object.assign(freshPlayer(x, y), {
       best: old.best, peak: G.meters(y), diamonds: old.diamonds, coins: old.coins, kills: old.kills, time: old.time,
-      held: old.held, hooks: old.hooks, // you keep your gun (or whatever you held) and your hooks
+      bag: { ...old.bag }, sel: old.sel, hooks: old.hooks, // you keep everything you carry and your hooks
       zone: cp ? cp.zone : 0, inv: 2, maxHearts: old.maxHearts, hearts: 3,
     });
     Object.assign(G, { voidY: y + 500, voidDelay: 3, banner: null, shake: 0, freeze: 0, shots: [], blasts: [] });

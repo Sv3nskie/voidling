@@ -68,12 +68,13 @@
       }
       if (this.api.wind.phase !== 'calm') this.show('wind', 'Wind gust! It pushes you sideways, especially in the air.');
       if (this.tip) return;
-      if (P.held && V.GUNS[P.held.type] && !this.api.touch) this.show('recoil', 'In the air, hold [↓] and press [SHIFT] to shoot down and boost yourself up!');
+      const held = V.G.held();
+      if (held && V.GUNS[held.type] && !this.api.touch) this.show('recoil', 'In the air, hold [↓] and press [SHIFT] to shoot down and boost yourself up!');
       if (this.tip) return;
       for (const it of tower.items) {
         if (it.dead || !near(it.x, it.y)) continue;
         if (it.type === 'diamond') this.show('diamond', 'A diamond! Grab it: if you die, it brings you back to your last checkpoint.');
-        else if (it.type === 'rock') this.show('rock', 'Walk over a rock to pick it up, then press [SHIFT] to throw. It auto-aims at the nearest enemy.');
+        else if (it.type === 'rock') this.show('rock', 'Walk over a stone to collect it, then press [SHIFT] to throw. It auto-aims at the nearest enemy.');
         else if (it.type === 'bomb') this.show('bomb', 'Void bomb! The blast launches you too. Throw it near your feet for a huge jump.');
         else if (V.GUNS[it.type]) this.show('gun', 'A gun! Grab it, then hold [SHIFT] to shoot. It auto-aims at the nearest enemy.');
         else if (V.BUFFS[it.type]) this.show('buff', 'A power-up! They hide in hard-to-reach spots. Grab it if you can.');
@@ -90,7 +91,7 @@
       // On phones, name the on-screen buttons instead of keyboard keys
       if (tipText && this.api.touch) {
         tipText = tipText.replace('[←] [→] or [A] [D]', '[◀] [▶]').replace(/\[SPACE\]/g, '[JUMP]')
-          .replace(/\[X\]/g, '[CHOMP]').replace(/\[SHIFT\]/g, '[SHOOT]').replace(/\[G\]/g, '[HOOK]');
+          .replace(/\[X\]/g, '[CHOMP]').replace(/\[SHIFT\]/g, '[SHOOT]').replace(/\[G\]/g, '[HOOK]').replace(/\[R\]/g, '[ITEM BAR]');
       }
       if (tipText) this.drawTip(ctx, tipText, W, H, this.tip ? '#ffcc4d' : '#5fe3ff');
     }
