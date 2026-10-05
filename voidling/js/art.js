@@ -235,6 +235,7 @@
         { x: 1250, y: 520, R: 70, spr: V.makePlanetSprite(70, 21, V.PLANET_PALS[1], 1) },
         { x: 1900, y: 260, R: 34, spr: V.makePlanetSprite(34, 5, V.PLANET_PALS[3], 1.5) },
         { x: 700, y: 1100, R: 110, spr: V.makePlanetSprite(110, 13, V.PLANET_PALS[2], 1) },
+        { x: 1650, y: 900, R: 52, spr: V.makePlanetSprite(52, 33, V.PLANET_PALS[4], 1.3) },
       ];
       this.canyons = [this.mesa(1700, 0.22, 11), this.mesa(1300, 0.13, 29)];
       // Distant islands in two depth layers: small, blurred and sunk into the haze, so they read
@@ -347,13 +348,20 @@
         V.drawGlow(ctx, sx, sy, 20 + s * 70, '#fff3b8', 0.6 + s * 0.4);
       }
 
-      for (const d of this.decor) {
+      const planets = V.art.pool('planet'); // your planets replace the drawn ones
+      this.decor.forEach((d, i) => {
         const size = d.spr.ext * 2;
         const x = wrap(d.x - this.px * 0.015, 2400) - d.spr.ext;
         const y = wrap(d.y - this.py * 0.03, 1600) - 300;
         ctx.globalAlpha = 0.85;
-        for (let ox = x; ox < W + size; ox += 2400) ctx.drawImage(d.spr.canvas, ox, y - d.spr.ext, size, size);
-      }
+        for (let ox = x; ox < W + size; ox += 2400) {
+          const f = planets.length && V.art.frame(planets[i % planets.length], { t });
+          if (!f) { ctx.drawImage(d.spr.canvas, ox, y - d.spr.ext, size, size); continue; }
+          const cx = ox + d.spr.ext, h = d.R * 2.1 * V.art.opt(planets[i % planets.length], 'scale', 1), w = h * f.sw / f.sh;
+          V.drawGlow(ctx, cx, y, d.R * 1.55, '#c78bff', 0.28); // soft atmosphere
+          ctx.drawImage(f.img, f.sx, f.sy, f.sw, f.sh, cx - w / 2, y - h / 2, w, h);
+        }
+      });
       ctx.globalAlpha = 1;
 
       // Light shafts falling through the sky: warm in the canyon, cold up in space

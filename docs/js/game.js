@@ -429,7 +429,8 @@
     const first = !p.lit;
     if (first) {
       p.lit = true;
-      G.checkpoint = { x: cx, y: p.y, zone: p.zone };
+      // Checkpoints inside a zone remember where the zone began, so a respawn can rebuild it
+      G.checkpoint = { x: cx, y: p.y, zone: p.zone, mid: !!p.midCp, zoneStart: p.midCp ? G.tower.zoneStarts[p.zone] || null : null };
       G.tower.burst(cx, p.y - 30, 20, '#5fe3ff', 4, 220);
       G.tower.ring(cx, p.y - 34, '#5fe3ff', 110, 0.7, 5);
       G.tower.sparkle(cx, p.y - 50, '#bff6ff', 10, 50);
@@ -440,15 +441,15 @@
     }
     if (touched && !p.touched) {
       p.touched = true;
-      if (P.hearts < P.maxHearts) P.hearts++;
-      G.voidY = Math.max(G.voidY, p.y + 600);
+      if (P.hearts < P.maxHearts && !p.midCp) P.hearts++; // the big zone beacons also heal
+      G.voidY = Math.max(G.voidY, p.y + (p.midCp ? 420 : 600));
       if (G.surge.phase !== 'calm') {
         Object.assign(G.surge, { phase: 'calm', t: V.rand(12, 18) });
         G.tower.popup(cx, p.y - 105, 'SURGE STOPPED', '#5fe3ff');
       }
       G.shake = 6;
     }
-    if (first || touched) G.tower.popup(cx, p.y - 80, touched ? 'CHECKPOINT  +1 HEART' : 'CHECKPOINT SAVED', '#5fe3ff');
+    if (first || touched) G.tower.popup(cx, p.y - 80, `CHECKPOINT ${G.meters(p.y)} m${touched && !p.midCp ? '  +1 HEART' : ''}`, '#5fe3ff');
   };
   G.updateMeta = dt => {
     const P = G.P, w = G.wind;

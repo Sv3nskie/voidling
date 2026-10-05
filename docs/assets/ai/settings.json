@@ -1,0 +1,214 @@
+{
+ "island_moss_a": {
+  "surface": 0.259
+ },
+ "island_moss_b": {
+  "surface": 0.325
+ },
+ "island_moss_c": {
+  "surface": 0.066
+ },
+ "island_moss_d": {
+  "surface": 0.065
+ },
+ "island_moss_e": {
+  "surface": 0.063
+ },
+ "island_moss_f": {
+  "surface": 0.203
+ },
+ "island_ember_a": {
+  "surface": 0.259
+ },
+ "island_ember_b": {
+  "surface": 0.325
+ },
+ "island_ember_c": {
+  "surface": 0.066
+ },
+ "island_ember_d": {
+  "surface": 0.065
+ },
+ "island_ember_e": {
+  "surface": 0.063
+ },
+ "island_ember_f": {
+  "surface": 0.203
+ },
+ "island_lavender_a": {
+  "surface": 0.259
+ },
+ "island_lavender_b": {
+  "surface": 0.325
+ },
+ "island_lavender_c": {
+  "surface": 0.066
+ },
+ "island_lavender_d": {
+  "surface": 0.065
+ },
+ "island_lavender_e": {
+  "surface": 0.063
+ },
+ "island_lavender_f": {
+  "surface": 0.203
+ },
+ "island_frost_a": {
+  "surface": 0.259
+ },
+ "island_frost_b": {
+  "surface": 0.325
+ },
+ "island_frost_c": {
+  "surface": 0.066
+ },
+ "island_frost_d": {
+  "surface": 0.065
+ },
+ "island_frost_e": {
+  "surface": 0.063
+ },
+ "island_frost_f": {
+  "surface": 0.203
+ },
+ "island_asteroid_a": {
+  "surface": 0.259
+ },
+ "island_asteroid_b": {
+  "surface": 0.325
+ },
+ "island_asteroid_c": {
+  "surface": 0.066
+ },
+ "island_asteroid_d": {
+  "surface": 0.065
+ },
+ "island_asteroid_e": {
+  "surface": 0.063
+ },
+ "island_asteroid_f": {
+  "surface": 0.203
+ },
+ "island_storm_a": {
+  "surface": 0.259
+ },
+ "island_storm_b": {
+  "surface": 0.325
+ },
+ "island_storm_c": {
+  "surface": 0.066
+ },
+ "island_storm_d": {
+  "surface": 0.065
+ },
+ "island_storm_e": {
+  "surface": 0.063
+ },
+ "island_storm_f": {
+  "surface": 0.203
+ },
+ "platform_zone1": {
+  "variants": [
+   "island_moss_*",
+   "island_ember_*"
+  ]
+ },
+ "deco_zone1": {
+  "variants": [
+   "deco_grass_moss",
+   "deco_bush_moss",
+   "deco_rock_moss",
+   "deco_cactus_moss",
+   "deco_grass_ember",
+   "deco_bush_ember",
+   "deco_rock_ember",
+   "deco_cactus_ember"
+  ]
+ },
+ "platform_zone2": {
+  "variants": [
+   "island_lavender_*",
+   "island_moss_*"
+  ]
+ },
+ "deco_zone2": {
+  "variants": [
+   "deco_grass_lavender",
+   "deco_bush_lavender",
+   "deco_rock_lavender",
+   "deco_grass_moss",
+   "deco_bush_moss",
+   "deco_rock_moss"
+  ]
+ },
+ "platform_zone3": {
+  "variants": [
+   "island_asteroid_*",
+   "island_frost_*"
+  ]
+ },
+ "deco_zone3": {
+  "variants": [
+   "deco_grass_asteroid",
+   "deco_bush_asteroid",
+   "deco_rock_asteroid",
+   "deco_grass_frost",
+   "deco_bush_frost",
+   "deco_rock_frost"
+  ]
+ },
+ "platform_zone4": {
+  "variants": [
+   "island_storm_*",
+   "island_asteroid_*"
+  ]
+ },
+ "deco_zone4": {
+  "variants": [
+   "deco_grass_storm",
+   "deco_bush_storm",
+   "deco_rock_storm",
+   "deco_grass_asteroid",
+   "deco_bush_asteroid",
+   "deco_rock_asteroid"
+  ]
+ },
+ "platform_zone5": {
+  "variants": [
+   "island_lavender_*",
+   "island_frost_*",
+   "island_storm_*"
+  ]
+ },
+ "deco_zone5": {
+  "variants": [
+   "deco_grass_lavender",
+   "deco_bush_lavender",
+   "deco_rock_lavender",
+   "deco_grass_frost",
+   "deco_bush_frost",
+   "deco_rock_frost",
+   "deco_grass_storm",
+   "deco_bush_storm",
+   "deco_rock_storm"
+  ]
+ },
+ "deco_cactus": {
+  "scale": 1.75
+ },
+ "deco_bush": {
+  "scale": 1.05
+ },
+ "deco_grass": {
+  "scale": 1.0
+ },
+ "deco_rock": {
+  "scale": 0.75
+ },
+ "ufo": {
+  "scale": 1.05
+ },
+ "planet": {
+  "scale": 1.0
+ }
+}

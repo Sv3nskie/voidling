@@ -19,6 +19,7 @@
     G.releaseTouch();
     // Death: a moment of slow motion while the Voidling swells and flashes, then it shatters
     G.deathFx = { x: P.x, y: P.y, face: P.face, t: 0, shattered: false };
+    G.banner = null; // no zone title over the death screens
     G.slow = 0.55;
     G.shake = 12;
     V.sfx.boom();
@@ -26,7 +27,7 @@
     if (P.diamonds > 0) {
       P.diamonds--;
       G.state = 'reviving'; G.overT = 0; G.paused = false;
-      G.revive = { reason, t: 0, to: G.checkpoint ? G.meters(G.checkpoint.y) : 0, left: P.diamonds };
+      G.revive = { reason, t: 0, to: G.checkpoint ? G.meters(G.checkpoint.y) : 0, left: P.diamonds, best: P.best };
       G.tower.burst(P.x, P.y, 30, '#bff6ff', 4, 260, 0, 1.2);
       setTimeout(() => V.sfx.tier(), 350);
       return;
@@ -56,22 +57,29 @@
     ctx.fillRect(0, 0, W, H);
     ctx.globalAlpha = a;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffd6e0'; ctx.font = `22px ${FONT_D}`;
-    ctx.fillText(r.reason, W / 2, H * 0.3);
+    ctx.fillStyle = '#ffd6e0'; ctx.font = `20px ${FONT_D}`;
+    ctx.fillText(r.reason, W / 2, H * 0.18);
+    // Your height so far stays your score: shown big, before where you'll respawn
+    ctx.fillStyle = '#b9a6d9'; ctx.font = `600 14px ${FONT_B}`;
+    ctx.fillText('YOU REACHED', W / 2, H * 0.245);
+    ctx.shadowColor = 'rgba(255,204,77,0.7)'; ctx.shadowBlur = 18;
+    ctx.fillStyle = '#ffcc4d'; ctx.font = `${Math.min(52, W / 10)}px ${FONT_D}`;
+    ctx.fillText(`${r.best} m`, W / 2, H * 0.305);
+    ctx.shadowBlur = 0;
     // The used diamond shatters in the middle, the ones left stay lit
     const used = V.clamp(r.t / 0.6, 0, 1);
-    if (used < 1) V.drawDiamond(ctx, W / 2, H * 0.43, 34 * (1 + used * 0.4), t);
+    if (used < 1) V.drawDiamond(ctx, W / 2, H * 0.43, 30 * (1 + used * 0.4), t);
     else for (let i = 0; i < 6; i++) {
       const ang = i * Math.PI / 3 + 0.4, d = 30 + (r.t - 0.6) * 160;
       ctx.fillStyle = `rgba(191,246,255,${Math.max(0, 1 - (r.t - 0.6))})`;
       ctx.fillRect(W / 2 + Math.cos(ang) * d - 4, H * 0.43 + Math.sin(ang) * d - 4, 8, 8);
     }
     ctx.shadowColor = '#5fe3ff'; ctx.shadowBlur = 20;
-    ctx.fillStyle = '#bff6ff'; ctx.font = `${Math.min(46, W / 14)}px ${FONT_D}`;
-    ctx.fillText('DIAMOND USED', W / 2, H * 0.56);
+    ctx.fillStyle = '#bff6ff'; ctx.font = `${Math.min(40, W / 15)}px ${FONT_D}`;
+    ctx.fillText('DIAMOND USED', W / 2, H * 0.55);
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#f4eaff'; ctx.font = `600 20px ${FONT_B}`;
-    ctx.fillText(r.to > 0 ? `Back to your checkpoint at ${r.to} m` : 'Back to the bottom (no checkpoint yet)', W / 2, H * 0.63);
+    ctx.fillText(r.to > 0 ? `Respawning at your checkpoint: ${r.to} m` : 'Respawning at the bottom (no checkpoint yet)', W / 2, H * 0.63);
     for (let i = 0; i < 3; i++) V.drawDiamond(ctx, W / 2 + (i - 1) * 40, H * 0.72, 12, t, i >= r.left);
     ctx.fillStyle = '#b9a6d9'; ctx.font = `500 15px ${FONT_B}`;
     ctx.fillText(r.left ? `${r.left} diamond${r.left > 1 ? 's' : ''} left` : 'No diamonds left. Next time it counts.', W / 2, H * 0.78);
@@ -280,8 +288,15 @@
     label('HEIGHT', pad, pad);
     ctx.shadowColor = 'rgba(255,204,77,0.6)'; ctx.shadowBlur = 14;
     ctx.fillStyle = '#ffcc4d'; ctx.font = `34px ${FONT_D}`;
-    ctx.fillText(`${G.meters(P.y)} m`, pad, pad + 14);
+    const hText = `${G.meters(P.y)} m`;
+    ctx.fillText(hText, pad, pad + 14);
     ctx.shadowBlur = 0;
+    if (P.best > G.meters(P.y) + 2) { // below your best (after a respawn or a fall): your score is still there
+      const hx = pad + ctx.measureText(hText).width + 12;
+      label('RUN BEST', hx, pad + 16);
+      ctx.fillStyle = '#f4eaff'; ctx.font = `16px ${FONT_D}`;
+      ctx.fillText(`${P.best} m`, hx, pad + 30);
+    }
     drawHearts(P, pad, t);
     for (let i = 0; i < 3; i++) V.drawDiamond(ctx, pad + 11 + i * 26, pad + 95, 9, t, i >= P.diamonds); // revives
     G.drawHeldHud(ctx);

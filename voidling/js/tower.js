@@ -42,24 +42,62 @@
   const G_P = () => V.G && V.G.P;
   // Your island art (assets/README.md): the first name that exists wins, most specific first.
   // name_left / name_middle / name_right tile to any width; a plain name stretches to the width.
+  const islandSeed = p => Math.abs(Math.round(p.y * 3.7 + p.baseX * 1.3));
   const platformArt = p => {
     if (!V.art.count) return null;
     const z = 'zone' + ((p.zone || 0) + 1), ty = p.beacon ? 'beacon' : p.type;
     for (const n of [`platform_${ty}_${z}`, `platform_${ty}`, `platform_${z}`, 'platform']) {
       if (V.art.has(n + '_middle')) return { slice: true, key: n + '_middle', l: V.art.pick(n + '_left'), m: n + '_middle', r: V.art.pick(n + '_right') };
-      if (V.art.has(n)) return { slice: false, key: n };
+      const v = V.art.choose(n, islandSeed(p)); // one of several designs, always the same one per island
+      if (v) return { slice: false, key: v, pool: n };
     }
     return null;
   };
+  // Decorations from your art ('deco_zone1' … pools): 0-2 per island, always in the same spots,
+  // never on checkpoint or shop islands or on spikes
+  const decoSpots = p => {
+    if (p.decos) return p.decos;
+    const s = islandSeed(p), n = p.w < 70 || p.beacon || p.shop ? 0 : p.w < 120 ? (s % 3 ? 1 : 0) : 1 + (s % 2);
+    p.decos = [];
+    for (let i = 0; i < n; i++) {
+      const u = (Math.imul(s + i * 977, 2654435761) >>> 0) / 4294967296;
+      const x = p.w * (0.12 + (i / Math.max(1, n) + u / n) * 0.76);
+      if (!p.spikes || x < p.spikes[0] - 12 || x > p.spikes[1] + 12) p.decos.push({ x, s: s + i * 31, flip: u > 0.5 });
+    }
+    return p.decos;
+  };
+  const drawDecos = (ctx, p, ox, oy, a, t) => {
+    if (!V.art.count) return;
+    let pool = V.art.pool(`deco_zone${(p.zone || 0) + 1}`);
+    if (!pool.length) return;
+    // match the island's color scheme: on island_lavender_c use the deco_*_lavender ones
+    const scheme = a && !a.slice && (a.key.match(/^island_([a-z]+)_/) || [])[1];
+    const same = scheme ? pool.filter(k => k.endsWith('_' + scheme)) : [];
+    if (same.length) pool = same;
+    for (const d of decoSpots(p)) {
+      V.art.draw(ctx, pool[d.s % pool.length], p.x + d.x + ox, p.y + oy + 2.5, { h: 15, anchor: 'bottom', flip: d.flip, t });
+    }
+  };
   // surface = how far down the image (0..1) the walkable top edge is
   const drawPlatformArt = (ctx, p, a, x0, y0, t) => {
-    const surf = V.art.opt(a.key, 'surface', 0.12), k = V.art.opt(a.key, 'scale', 1);
     if (!a.slice) {
-      const f = V.art.frame(a.key, { t }), over = V.art.opt(a.key, 'overhang', 0.04);
-      const W = p.w * (1 + over * 2), H = W * f.sh / f.sw * k;
-      ctx.drawImage(f.img, f.sx, f.sy, f.sw, f.sh, x0 - p.w * over, y0 - H * surf, W, H);
+      // Wide islands are built from several designs side by side (overlapping), so no image is
+      // ever stretched out of shape; each one's walkable edge sits exactly on the island top
+      const n = Math.max(1, Math.ceil(p.w / V.art.opt(a.key, 'piece', 230))), seg = p.w / n;
+      // pieces of one island share its color scheme (island_moss_a → other island_moss_*)
+      const fam = n > 1 ? V.art.pool(a.pool).filter(k => k.startsWith(a.key.replace(/_[^_]+$/, '_'))) : null;
+      for (let i = 0; i < n; i++) {
+        const key = fam && fam.length ? fam[(islandSeed(p) + i * 7) % fam.length] : a.key;
+        const f = V.art.frame(key, { t });
+        if (!f) continue;
+        const over = V.art.opt(key, 'overhang', 0.04), k = V.art.opt(key, 'scale', 1), surf = V.art.opt(key, 'surface', 0.12);
+        const pw = seg * (n > 1 ? 1.32 : 1), W = pw * (1 + over * 2), H = W * f.sh / f.sw * k;
+        const cx = x0 + seg * (i + 0.5);
+        ctx.drawImage(f.img, f.sx, f.sy, f.sw, f.sh, cx - W / 2, y0 - H * surf, W, H);
+      }
       return;
     }
+    const surf = V.art.opt(a.key, 'surface', 0.12), k = V.art.opt(a.key, 'scale', 1);
     const H = V.art.opt(a.key, 'height', 44) * k, top = y0 - H * surf;
     const fl = a.l && V.art.frame(a.l, { t }), fm = V.art.frame(a.m, { t }), fr = a.r && V.art.frame(a.r, { t });
     let lw = fl ? H * fl.sw / fl.sh : 0, rw = fr ? H * fr.sw / fr.sh : 0;
@@ -99,6 +137,7 @@
       this.particles = []; this.popups = []; this.fx = [];
       this.seed = 1; this.genY = 0; this.last = null; this.zoneMade = 0; this.rows = 0;
       this.rowLog = []; this.xZone = -1; this.xseed = 500000;
+      this.zoneStarts = this.zoneStarts || {}; // where each zone's opening beacon is (same every run)
     }
     // ---------- Fixed seed: every player climbs the exact same tower ----------
     // Each zone restarts the generator from its own seed, so a continue from a beacon
@@ -127,8 +166,10 @@
     }
     // Continue from a beacon: wipe everything and rebuild upward from it
     restartFrom(cp, ppu) {
+      if (cp.mid) return this.restartMid(cp, ppu);
       this.reset();
       this.ppu = ppu;
+      this.zoneStarts[cp.zone] = { x: cp.x, y: cp.y, zone: cp.zone };
       this.reseed(cp.zone);
       const p = this.seeded(() => this.addPlat(cp.x - BEACON_W / 2, cp.y, BEACON_W, 'solid', { beacon: true, zone: cp.zone, depth: BEACON_DEPTH }));
       p.lit = true; p.touched = true;
@@ -137,6 +178,18 @@
       this.genY = cp.y;
       this.zoneMade = cp.zone;
       this.rows = 1000; // past the early-game rows, same as the first time through
+      return p;
+    }
+    // Continue from a checkpoint inside a zone: rebuild the zone from its opening beacon (it
+    // comes out the same every time) up past the checkpoint, so everything above it is exactly
+    // as before, then drop what's below
+    restartMid(cp, ppu) {
+      if (cp.zoneStart) this.restartFrom(cp.zoneStart, ppu);
+      else { this.reset(); this.init(ppu); }
+      this.generate(cp.y - 1400);
+      this.cull(cp.y + 220);
+      const p = this.plats.find(q => q.midCp && Math.abs(q.y - cp.y) < 1 && Math.abs(q.x + q.w / 2 - cp.x) < 1);
+      if (p) { p.lit = true; p.touched = true; }
       return p;
     }
 
@@ -260,6 +313,7 @@
         this.zoneMade = zi;
         this.reseed(zi);
         const b = this.addPlat(spot.cx - BEACON_W / 2, spot.y, BEACON_W, 'solid', { beacon: true, zone: zi, depth: BEACON_DEPTH });
+        this.zoneStarts[zi] = { x: spot.cx, y: spot.y, zone: zi };
         this.rowLog.push({ p: b, cx: spot.cx, w: BEACON_W, y: spot.y, zi, jelly: false });
         this.last = { cx: spot.cx, y: spot.y, w: BEACON_W };
         this.genY = spot.y;
@@ -331,6 +385,7 @@
           this.xrng = V.rng(EXTRAS_SEED + r.zi * 911);
           this.diamondDue = V.ZONES[r.zi].at + 30 + this.xrng() * 25;
           this.shopDue = V.ZONES[r.zi].at + 100;
+          this.cpDue = V.ZONES[r.zi].at + 50;
         }
         const prev = V.random;
         V.random = this.xrng;
@@ -355,6 +410,24 @@
         }
       }
       if (!p.beacon && !p.shop && m >= this.diamondDue && this.placeDiamond(r)) this.diamondDue = m + V.rand(70, 110);
+      // Checkpoints between the zone beacons, all the way up: at 50, 150, 250 m ... into each
+      // zone the first solid island that's wide enough becomes one. If none comes within 30 m,
+      // the next island that isn't moving takes it, even a narrow one, and a crumbling one is
+      // made solid (a checkpoint must be safe). No island is added or moved and no random
+      // numbers are used, so the shops and diamonds stay exactly where they were.
+      if (!p.beacon && m >= this.cpDue && this.cpDue < nextZone - 40) {
+        const late = m >= this.cpDue + 30, ok = q => !q.beacon && !q.shop && !q.extra && q.type === 'solid' && q.w >= 60;
+        // this row's island, else a solid side island next to it, else (late) this row's island
+        // even if it's narrow or crumbling
+        let host = !r.jelly && ok(p) ? p : this.plats.find(q => q !== p && ok(q) && Math.abs(q.y - r.y) < 45);
+        if (!host && late && !r.jelly && !p.shop && p.type !== 'moving' && r.w >= 44) host = p;
+        if (host) {
+          if (host.type === 'crumble') { host.type = 'solid'; host.cracks = null; }
+          host.beacon = true; host.midCp = true; host.spikes = null;
+          for (const e of this.enemies) if (e.plat === host || e.island === host) e.dead = true; // a safe place to come back to
+          while (this.cpDue <= -host.y / M) this.cpDue += 100;
+        }
+      }
     }
     marketIsland(r) {
       const lw = 96, ld = this.rockDepth(lw);
@@ -710,6 +783,7 @@
         const custom = platformArt(p);
         if (custom) drawPlatformArt(ctx, p, custom, p.x + ox, p.y + oy, t);
         else ctx.drawImage(p.spr.canvas, p.x - p.spr.ox + ox, p.y - p.spr.oy + oy, p.spr.sw, p.spr.sh);
+        drawDecos(ctx, p, ox, oy, custom, t);
         if (p.cracks) {
           ctx.strokeStyle = 'rgba(20,5,30,0.85)'; ctx.lineWidth = 2;
           for (const line of p.cracks) {

@@ -8,6 +8,7 @@
 (() => {
   const V = window.V;
   const sets = new Map(); // name -> { frames: [{ img, sx, sy, sw, sh }], name }
+  const pools = new Map(); // name -> { count, list } (variant lists, rebuilt when art changes)
   let settings = {};
   const IMG = /\.(png|webp|jpe?g|gif|svg|avif)$/i;
 
@@ -42,6 +43,33 @@
       i = age !== undefined || frame !== undefined ? Math.max(0, Math.min(n - 1, i)) : ((i % n) + n) % n;
       return s.frames[i];
     },
+    // Variants: several designs for one thing. Either files named name_v1, name_v2 … or a pool
+    // in settings.json: { "name": { "variants": ["island_moss_*", "island_ember_*"] } }.
+    // pool(name) lists the art names; choose(name, seed) picks one, the same one for the same seed.
+    pool(name) {
+      if (!name) return [];
+      const hit = pools.get(name);
+      if (hit && hit.count === sets.size) return hit.list;
+      const s = settings[name];
+      let list;
+      if (s && s.variants) {
+        const keys = [...sets.keys()].sort();
+        list = s.variants.flatMap(v => {
+          const re = new RegExp('^' + v.toLowerCase().split('*').map(x => x.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
+          return keys.filter(k => re.test(k));
+        });
+      } else {
+        list = [...sets.keys()].filter(k => k.startsWith(name + '_v') && /^\d+$/.test(k.slice(name.length + 2)))
+          .sort((a, b) => a.slice(name.length + 2) - b.slice(name.length + 2));
+        if (!list.length && sets.has(name)) list = [name];
+      }
+      pools.set(name, { count: sets.size, list });
+      return list;
+    },
+    choose(name, seed = 0) {
+      const p = art.pool(name);
+      return p.length ? p[Math.abs(Math.floor(seed)) % p.length] : null;
+    },
     // Duration of a one-shot animation in seconds
     duration: name => (sets.has(name) ? art.frames(name) / opt(name, 'fps', 10) : 0),
     // Draw art `name` at x, y. Size: h = height (or w = width) in world units, before the
@@ -72,8 +100,14 @@
       if (!r.ok) return;
       files = (await r.json()).files || [];
     } catch (e) { return; } // no custom art: the built-in drawings are used
-    if (files.includes('settings.json')) {
-      try { settings = await (await fetch('assets/settings.json', { cache: 'no-cache' })).json(); } catch (e) { console.warn('assets/settings.json is not valid JSON', e); }
+    // Every settings.json is read, deepest folder first, so yours in assets/ has the last word
+    const configs = files.filter(f => f.split('/').pop().toLowerCase() === 'settings.json')
+      .sort((a, b) => b.split('/').length - a.split('/').length);
+    for (const f of configs) {
+      try {
+        const s = await (await fetch('assets/' + f, { cache: 'no-cache' })).json();
+        for (const [k, v] of Object.entries(s)) settings[k.toLowerCase()] = Object.assign(settings[k.toLowerCase()] || {}, v);
+      } catch (e) { console.warn(`assets/${f} is not valid JSON`, e); }
     }
     const groups = new Map();
     for (const file of files) {

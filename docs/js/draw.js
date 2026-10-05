@@ -213,7 +213,7 @@
     if (e.charging) V.drawGlow(ctx, x, y + a * 0.5, a * 2.4, '#ff2050', 0.55 + 0.4 * Math.sin(t * 22));
     V.drawGlow(ctx, x, y + a * 0.6, a * 2, e.charging ? '#ff4f7a' : '#5fe3ff', 0.5);
     const tilt = V.clamp(e.vx / (a * 20), -0.3, 0.3) + (e.spin || 0);
-    if (V.art.draw(ctx, V.art.pick('ufo', 'saucer'), x, y, { w: a * 2.8, rot: tilt, t })) return;
+    if (V.art.draw(ctx, V.art.choose('ufo', e.phase * 1000) || V.art.pick('saucer'), x, y, { w: a * 2.8, rot: tilt, t })) return;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(tilt);
