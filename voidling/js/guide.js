@@ -90,7 +90,7 @@
       let tipText = this.tip ? this.tip.text : this.step < TUTORIAL.length ? TUTORIAL[this.step].text : null;
       // On phones, name the on-screen buttons instead of keyboard keys
       if (tipText && this.api.touch) {
-        tipText = tipText.replace('[←] [→] or [A] [D]', '[◀] [▶]').replace(/\[SPACE\]/g, '[JUMP]')
+        tipText = tipText.replace('with [←] [→] or [A] [D]', 'with the [◀ ▶] slider').replace(/\[SPACE\]/g, '[JUMP]')
           .replace(/\[X\]/g, '[CHOMP]').replace(/\[SHIFT\]/g, '[SHOOT]').replace(/\[G\]/g, '[HOOK]').replace(/\[R\]/g, '[ITEM BAR]');
       }
       if (tipText) this.drawTip(ctx, tipText, W, H, this.tip ? '#ffcc4d' : '#5fe3ff');

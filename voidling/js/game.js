@@ -116,7 +116,8 @@
       P.trail = P.trail.filter(tr => tr.life > 0);
       return;
     }
-    const dir = (I.down('right') ? 1 : 0) - (I.down('left') ? 1 : 0);
+    // -1..1: the touch slider pushes partway (slower), keys and gamepad push all the way
+    const dir = I.axis || (I.down('right') ? 1 : 0) - (I.down('left') ? 1 : 0);
     if (P.onGround && P.plat && P.plat.type === 'moving') P.x += P.plat.dx;
     if (P.dashT > 0) {
       P.dashT -= dt;
@@ -124,7 +125,7 @@
       P.trail.push({ x: P.x, y: P.y, life: 0.2 });
     } else {
       P.vx = V.approach(P.vx, dir * PH.RUN, (P.onGround ? PH.ACC_G : PH.ACC_A) * dt);
-      if (dir) { P.face = dir; G.guide.event('move', dt); }
+      if (dir) { P.face = Math.sign(dir); G.guide.event('move', dt); }
     }
     if (G.wind.power) P.vx += G.wind.dir * G.wind.power * (P.onGround ? 0.3 : 1) * dt;
 
@@ -152,7 +153,7 @@
     if (I.hit('chomp') && P.dashCd <= 0 && (P.onGround || P.airDash)) {
       P.dashT = PH.DASH_T; P.dashCd = 0.3; P.mouth = 1;
       if (!P.onGround) P.airDash = false;
-      if (dir) P.face = dir;
+      if (dir) P.face = Math.sign(dir);
       T.orbit(P.x - P.face * 6, P.y, '#c9a2ff', 7, 22, 0, 0.28); // shock ring left behind as you lunge
       V.sfx.dash();
       G.guide.event('dash');

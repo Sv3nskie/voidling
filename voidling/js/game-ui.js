@@ -151,7 +151,7 @@
     const P = G.P, I = V.input, PH = G.PH, R = G.R;
     G.fallGuide = null;
     if (P.onGround || P.vy < 120 || P.rescue || P.hook || G.hold) return;
-    const dir = (I.down('right') ? 1 : 0) - (I.down('left') ? 1 : 0);
+    const dir = I.axis || (I.down('right') ? 1 : 0) - (I.down('left') ? 1 : 0);
     let x = P.x, y = P.y, vx = P.vx, vy = P.vy, land = null;
     const path = [];
     for (let i = 0; i < 150 && !land; i++) {
@@ -681,38 +681,46 @@
     return G.state === 'title' ? 'exit' : 'handled';
   };
   $('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); G.setPaused(!G.paused); });
-  // ◀ ▶ work like a slider: the side of the pad under your thumb is the direction, so you can
-  // slide from one to the other without lifting (and keep running if you slide past the edge)
-  const dpad = touchEl.querySelector('.pad');
-  const thumbs = new Map(); // pointerId -> 'left' | 'right'
-  const dirAt = x => {
-    const [l, r] = [...dpad.querySelectorAll('button')].map(b => b.getBoundingClientRect());
-    return x < (l.left + l.width / 2 + r.left + r.width / 2) / 2 ? 'left' : 'right';
+  // ◀ ▶ slider: where your thumb lands is the still point, so resting it moves nothing. Slide
+  // left or right from there to run: slowly at first, full speed SLIDE_DEAD + SLIDE_RANGE px
+  // out. On a long slide the still point follows your thumb, so turning around is quick. The
+  // knob shows the push; lifting stops you.
+  const SLIDE_DEAD = 9, SLIDE_RANGE = 34;
+  const slider = touchEl.querySelector('.slider'), knob = slider.querySelector('.knob');
+  const arrowL = slider.querySelector('.arrow.l'), arrowR = slider.querySelector('.arrow.r');
+  let thumb = null; // { id, ox }: the pointer on the slider and its still point
+  const setStick = v => {
+    V.input.axis = v;
+    if (v < 0) V.input.press('left'); else V.input.release('left');
+    if (v > 0) V.input.press('right'); else V.input.release('right');
+    arrowL.classList.toggle('lit', v < 0); arrowR.classList.toggle('lit', v > 0);
+    knob.style.transform = `translateX(${(v * (slider.clientWidth - knob.offsetWidth - 8) / 2).toFixed(1)}px)`;
   };
-  const dpadSync = () => {
-    const held = new Set(thumbs.values());
-    for (const a of ['left', 'right']) {
-      if (held.has(a)) V.input.press(a); else V.input.release(a);
-      dpad.querySelector(`[data-act="${a}"]`).classList.toggle('on', held.has(a));
-    }
+  const stickAt = x => {
+    const lim = SLIDE_DEAD + SLIDE_RANGE;
+    let dx = x - thumb.ox;
+    if (Math.abs(dx) > lim) { thumb.ox = x - Math.sign(dx) * lim; dx = Math.sign(dx) * lim; }
+    const m = Math.abs(dx);
+    return m <= SLIDE_DEAD ? 0 : Math.sign(dx) * (0.4 + 0.6 * (m - SLIDE_DEAD) / SLIDE_RANGE);
   };
-  dpad.addEventListener('pointerdown', e => {
+  const sliderOff = e => {
+    if (!thumb || (e && e.pointerId !== thumb.id)) return;
+    thumb = null; slider.classList.remove('held'); setStick(0);
+  };
+  slider.addEventListener('pointerdown', e => {
     e.preventDefault(); V.audio.init();
-    try { dpad.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
-    thumbs.set(e.pointerId, dirAt(e.clientX)); dpadSync();
+    if (thumb) return; // one thumb steers
+    try { slider.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+    thumb = { id: e.pointerId, ox: e.clientX };
+    slider.classList.add('held'); setStick(0);
   });
-  dpad.addEventListener('pointermove', e => {
-    if (!thumbs.has(e.pointerId)) return;
-    const d = dirAt(e.clientX);
-    if (d !== thumbs.get(e.pointerId)) { thumbs.set(e.pointerId, d); dpadSync(); }
-  });
-  const dpadOff = e => { if (thumbs.delete(e.pointerId)) dpadSync(); };
+  slider.addEventListener('pointermove', e => { if (thumb && e.pointerId === thumb.id) setStick(stickAt(e.clientX)); });
+  slider.addEventListener('pointerup', sliderOff);
+  slider.addEventListener('pointercancel', sliderOff);
   G.releaseTouch = () => { // no stuck direction or lit button after a pause or death
-    if (thumbs.size) { thumbs.clear(); dpadSync(); }
+    sliderOff();
     touchEl.querySelectorAll('.pad.grid button.on').forEach(b => { b.classList.remove('on'); V.input.release(b.dataset.act); });
   };
-  dpad.addEventListener('pointerup', dpadOff);
-  dpad.addEventListener('pointercancel', dpadOff);
   document.querySelectorAll('#touch .pad.grid button').forEach(b => {
     const act = b.dataset.act;
     const on = e => { e.preventDefault(); V.audio.init(); V.input.press(act); b.classList.add('on'); };

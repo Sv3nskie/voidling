@@ -1,7 +1,7 @@
 // Voidling core: math helpers, input, audio, glow sprites
 (() => {
   const V = (window.V = window.V || {});
-  V.VERSION = '0.3.2'; // shown on the title screen, so bug reports can say which build
+  V.VERSION = '0.3.3'; // shown on the title screen, so bug reports can say which build
 
   // ---------- Settings (saved on this device) ----------
   // fx = cinematic effects (bloom, film grain, light rays, foreground haze); depth = 3D islands
@@ -106,6 +106,7 @@
   };
 
   V.input = {
+    axis: 0, // -1..1 from the touch slider (0 when it isn't touched); keys and pads use left / right
     down: a => keys.has(a),
     hit: a => pressed.has(a),
     endFrame: () => pressed.clear(),
