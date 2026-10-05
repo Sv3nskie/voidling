@@ -3,7 +3,9 @@
   const V = window.V;
   const HALF = (V.HALF = 340); // half width of the climbable shaft
   const TOWER_SEED = 20261004;  // change this to build a different tower (for everyone)
-  const BEACON_DEPTH = 90, BEACON_W = 200; // beacon islands also host the trader
+  const BEACON_DEPTH = 90, BEACON_W = 170;
+  // Diamonds and trading posts are extras layered on top of the level, with their own seed
+  const EXTRAS_SEED = TOWER_SEED * 3 + 101, EXTRAS_LAG = 450;
   const M = (V.M = 10);        // world units per meter
 
   // Difficulty per zone. gap = vertical distance between platforms, w = platform width.
@@ -44,6 +46,7 @@
       this.plats = []; this.enemies = []; this.items = []; this.bullets = []; this.clouds = [];
       this.particles = []; this.popups = [];
       this.seed = 1; this.genY = 0; this.last = null; this.zoneMade = 0; this.rows = 0;
+      this.rowLog = []; this.xZone = -1; this.xseed = 500000;
     }
     // ---------- Fixed seed: every player climbs the exact same tower ----------
     // Each zone restarts the generator from its own seed, so a continue from a beacon
@@ -52,8 +55,6 @@
       this.rng = V.rng(TOWER_SEED + zone * 7777);
       this.seed = 1 + zone * 1000;
       this.bag = [];
-      this.diamondDue = null; // height (m) of the next diamond in this zone
-      this.shopDue = V.ZONES[zone].at + 100; // next trader island (the zone start has the beacon one)
       if (this.building) V.random = this.rng;
     }
     seeded(fn) {
@@ -78,8 +79,8 @@
       this.ppu = ppu;
       this.reseed(cp.zone);
       const p = this.seeded(() => this.addPlat(cp.x - BEACON_W / 2, cp.y, BEACON_W, 'solid', { beacon: true, zone: cp.zone, depth: BEACON_DEPTH }));
-      p.shop = V.ZONES[cp.zone].at / 100;
       p.lit = true; p.touched = true;
+      this.rowLog.push({ p, cx: cp.x, w: BEACON_W, y: cp.y, zi: cp.zone, jelly: false });
       this.last = { cx: cp.x, y: cp.y, w: BEACON_W };
       this.genY = cp.y;
       this.zoneMade = cp.zone;
@@ -97,8 +98,8 @@
         x, y, w, depth, type, baseX: x, amp, speed: 0, phase: V.random() * 6.28, dx: 0,
         sx0: x - amp, sx1: x + w + amp, // horizontal space it ever covers
         crumbleT: -1, fallen: false, fallY: 0, fallV: 0, respawnT: 0, spikes: null,
-        beacon: !!o.beacon, lit: false, zone: o.zone || 0,
-        spr: V.makeIslandSprite(w, depth, this.seed++ * 7919, pal, this.ppu),
+        beacon: !!o.beacon, lit: false, zone: o.zone || 0, extra: !!o.extra,
+        spr: V.makeIslandSprite(w, depth, (o.extra ? this.xseed++ : this.seed++) * 7919, pal, this.ppu),
         cracks: null,
       };
       if (type === 'moving') p.speed = V.rand(0.8, 1.5);
@@ -157,11 +158,13 @@
     // Space check so islands never overlap: how deep a platform covering x0..x1 with its top
     // at y may hang before crowding the platform below (leaving standing room), and whether
     // a platform above already hangs down into its standing room.
-    room(x0, x1, y) {
+    // The level generator never sees the extras (opts.extras), so they can't move an island.
+    room(x0, x1, y, opts = {}) {
       let maxD = Infinity, clear = true;
+      const minZone = opts.zone ?? this.zoneMade;
       for (const q of this.plats) {
         // Earlier zones are ignored so a continue from a beacon rebuilds the exact same zone
-        if (q.zone < this.zoneMade || q.sx0 > x1 + 14 || q.sx1 < x0 - 14) continue;
+        if (q.zone < minZone || (q.extra && !opts.extras) || q.sx0 > x1 + 14 || q.sx1 < x0 - 14) continue;
         if (q.y > y) maxD = Math.min(maxD, q.y - y - (q.beacon ? 84 : 52));
         else if (q.y + q.depth > y - 52) clear = false;
       }
@@ -170,6 +173,7 @@
 
     generate(topY) {
       if (this.genY > topY) this.seeded(() => { while (this.genY > topY) this.row(); });
+      this.extras();
     }
     // Islands always get a chunky rock body, like the reference art
     rockDepth(w) { return w * V.rand(0.42, 0.6); }
@@ -204,7 +208,7 @@
         this.zoneMade = zi;
         this.reseed(zi);
         const b = this.addPlat(spot.cx - BEACON_W / 2, spot.y, BEACON_W, 'solid', { beacon: true, zone: zi, depth: BEACON_DEPTH });
-        b.shop = V.ZONES[zi].at / 100; // zones start at 100, 300, 600, 900 m: trader shares the island
+        this.rowLog.push({ p: b, cx: spot.cx, w: BEACON_W, y: spot.y, zi, jelly: false });
         this.last = { cx: spot.cx, y: spot.y, w: BEACON_W };
         this.genY = spot.y;
         return;
@@ -213,25 +217,16 @@
       const gap = jelly ? V.rand(170, 215) : V.rand(z.gap[0], z.gap[1]);
       let type = 'solid';
       if (!jelly) { if (V.chance(z.moving)) type = 'moving'; else if (V.chance(z.crumble)) type = 'crumble'; }
-      let amp = type === 'moving' ? V.rand(50, 110) : 0;
-      let w0 = V.rand(z.w[0], z.w[1]);
-      // A trader island every 100 m (beacon islands cover 100, 300, 600 and 900 m). It is a
-      // wide, solid, safe island; if this row can't be one, the next row tries again.
-      const nextZone = V.ZONES[zi + 1] ? V.ZONES[zi + 1].at : Infinity;
-      const shop = !jelly && this.shopDue < nextZone && -(prev.y - gap) / M >= this.shopDue;
-      if (shop) { type = 'solid'; amp = 0; w0 = Math.max(w0, 160); }
+      const amp = type === 'moving' ? V.rand(50, 110) : 0;
+      const w0 = V.rand(z.w[0], z.w[1]);
       const spot = this.place(prev, w0, this.rockDepth(w0), gap, jelly ? gap : 150, jelly ? 20 : 110, amp);
       const { cx, y, w } = spot;
       const p = this.addPlat(cx - w / 2, y, w, type, { zone: zi, amp, depth: spot.depth });
+      this.rowLog.push({ p, cx, w, y, zi, jelly });
       if (jelly) this.addEnemy('jelly', (prev.cx + cx) / 2, (prev.y + y) / 2);
-      if (shop) { p.shop = this.shopDue / 100; this.shopDue += 100; } // no enemies or spikes here
-      else this.decorate(p, z, false);
+      this.decorate(p, z, false);
       if (++this.rows === 9) this.addItem('blaster', cx, y - 30); // first gun comes early
       else if (this.rows > 4 && V.chance(0.2)) this.secret(cx, w, y, zi);
-      // Diamonds: about one every 70-110 m, always in a hard-to-reach spot
-      const m = -y / M;
-      if (this.diamondDue === null) this.diamondDue = m + V.rand(30, 55);
-      if (m >= this.diamondDue) { this.diamond(p, cx, w, y, zi); this.diamondDue = m + V.rand(70, 110); }
       if (V.chance(0.35)) this.coinArc(prev.cx, prev.y, cx, y);
       // Optional side island for variety (never needed to progress); skipped if it would crowd
       if (!jelly && V.chance(0.45)) {
@@ -250,9 +245,9 @@
     }
     // A power-up in a hard-to-reach spot: a small ledge far off the main path, hidden in a
     // cloud (needs jump + double jump + air dash), or floating high above the platform.
-    secret(cx, w, y, zi, item = null) {
-      if (!item && !this.bag.length) this.bag = V.buffBag(zi);
-      const buff = item || this.bag.pop(), lw = 58;
+    secret(cx, w, y, zi) {
+      if (!this.bag.length) this.bag = V.buffBag(zi);
+      const buff = this.bag.pop(), lw = 58;
       const gap = V.rand(170, 215), ly = y - V.rand(20, 70);
       const right = cx + w / 2 + gap, left = cx - w / 2 - gap - lw;
       const options = [];
@@ -271,13 +266,78 @@
         this.addItem(buff, V.clamp(cx + V.rand(-w / 2, w / 2), -HALF + 24, HALF - 24), y - V.rand(150, 178));
       }
     }
-    // Where a diamond goes: right over a spike strip (grab it without landing on the spikes),
-    // high above the platform (needs a full double jump), or on a hidden ledge off to the side
-    diamond(p, cx, w, y, zi) {
-      const r = V.random();
-      if (p.spikes && r < 0.6) this.addItem('diamond', p.x + (p.spikes[0] + p.spikes[1]) / 2, p.y - 40);
-      else if (r < 0.55) this.addItem('diamond', V.clamp(cx + V.rand(-w / 2, w / 2), -HALF + 24, HALF - 24), y - V.rand(150, 175));
-      else this.secret(cx, w, y, zi, 'diamond');
+
+    // ---------- Extras: diamonds and trading posts, layered on top of the level ----------
+    // They use their own random numbers, are added to a row only once the rows above it exist,
+    // and the level generator never looks at them. So the islands, enemies and items stay
+    // exactly where they were before these features existed.
+    extras() {
+      while (this.rowLog.length && this.rowLog[0].y > this.genY + EXTRAS_LAG) {
+        const r = this.rowLog.shift();
+        if (r.zi !== this.xZone) { // each zone starts its extras fresh (same after a continue)
+          this.xZone = r.zi;
+          this.xrng = V.rng(EXTRAS_SEED + r.zi * 911);
+          this.diamondDue = V.ZONES[r.zi].at + 30 + this.xrng() * 25;
+          this.shopDue = V.ZONES[r.zi].at + 100;
+        }
+        const prev = V.random;
+        V.random = this.xrng;
+        try { this.extra(r); } finally { V.random = prev; }
+      }
+    }
+    extra(r) {
+      const m = -r.y / M, p = r.p;
+      // Trading post: shares the beacon island at 100, 300, 600 and 900 m; otherwise the first
+      // solid island at or after each 100 m mark (its enemies and spikes are cleared away)
+      const nextZone = V.ZONES[r.zi + 1] ? V.ZONES[r.zi + 1].at : Infinity;
+      if (p.beacon) p.shop = V.ZONES[r.zi].at / 100;
+      else if (!r.jelly && this.shopDue < nextZone && m >= this.shopDue) {
+        // On this island if it's solid and wide enough, else on a small market island added
+        // beside it within easy jumping distance; else the next row tries again
+        const host = p.type === 'solid' && r.w >= 60 ? p : this.marketIsland(r);
+        if (host) {
+          host.shop = this.shopDue / 100;
+          this.shopDue += 100;
+          host.spikes = null;
+          for (const e of this.enemies) if (e.plat === host) e.dead = true;
+        }
+      }
+      if (!p.beacon && !p.shop && m >= this.diamondDue && this.placeDiamond(r)) this.diamondDue = m + V.rand(70, 110);
+    }
+    marketIsland(r) {
+      const lw = 96, ld = this.rockDepth(lw);
+      for (let i = 0; i < 6; i++) {
+        const gap = V.rand(40, 95), ly = r.y - V.rand(-15, 45);
+        const lx = i % 2 ? r.cx + r.w / 2 + r.p.amp + gap : r.cx - r.w / 2 - r.p.amp - gap - lw;
+        if (lx < -HALF + 4 || lx + lw > HALF - 4) continue;
+        const s = this.room(lx - 10, lx + lw + 10, ly, { zone: r.zi, extras: true });
+        if (s.clear && s.maxD >= ld) return this.addPlat(lx, ly, lw, 'solid', { zone: r.zi, depth: ld, extra: true });
+      }
+      return null;
+    }
+    // A diamond goes right over a spike strip, high above the island (needs a full double
+    // jump), or on a small hidden ledge off to the side. Returns false to try the next row.
+    placeDiamond(r) {
+      const p = r.p, roll = V.random();
+      if (p.spikes && roll < 0.6) { this.addItem('diamond', p.x + (p.spikes[0] + p.spikes[1]) / 2, p.y - 40); return true; }
+      if (roll < 0.55) {
+        const x = V.clamp(r.cx + V.rand(-r.w / 2, r.w / 2), -HALF + 24, HALF - 24), y = r.y - V.rand(150, 175);
+        if (!this.solidAt(x, y) && !this.solidAt(x, y + 14)) { this.addItem('diamond', x, y); return true; }
+      }
+      const lw = 58, gap = V.rand(170, 215), ly = r.y - V.rand(20, 70);
+      const right = r.cx + r.w / 2 + gap, left = r.cx - r.w / 2 - gap - lw;
+      const options = [];
+      if (right + lw <= HALF - 4) options.push(right);
+      if (left >= -HALF + 4) options.push(left);
+      const lx = options.length ? V.pick(options) : null, ld = this.rockDepth(lw) * 1.3;
+      const s = lx === null ? null : this.room(lx - 20, lx + lw + 20, ly, { zone: r.zi, extras: true });
+      if (!s || !s.clear || s.maxD < ld) return false;
+      this.addPlat(lx, ly, lw, 'solid', { zone: r.zi, depth: ld, extra: true });
+      this.addItem('diamond', lx + lw / 2, ly - 28);
+      const blobs = [];
+      for (let i = 0; i < 7; i++) blobs.push([V.rand(-55, 55), V.rand(-45, 30), V.rand(45, 75)]);
+      this.clouds.push({ x: lx + lw / 2, y: ly - 20, blobs });
+      return true;
     }
     decorate(p, z, branch) {
       const room = p.w >= 90 && p.type !== 'moving';
@@ -450,7 +510,9 @@
         }
         if (p.spikes) V.drawSpikes(ctx, p.x + p.spikes[0], p.x + p.spikes[1], p.y + oy - 2, t);
         if (p.beacon) V.drawBeacon(ctx, p.x + p.w / 2, p.y + oy - 2, p.lit, t);
-        if (p.shop) V.drawShop(ctx, p.x + p.w * (p.beacon ? 0.78 : 0.5), p.y + oy - 2, t, p.shopUsed);
+        // Trading post stall: beside the beacon crystal, or in the middle; scaled to fit the island
+        if (p.shop) V.drawShop(ctx, p.beacon ? p.x + p.w - 40 : p.x + p.w / 2, p.y + oy - 2, t, p.shopUsed,
+          p.beacon ? 0.72 : V.clamp((p.w - 10) / 80, 0.6, 1));
         ctx.globalAlpha = 1;
       }
       for (const it of this.items) {

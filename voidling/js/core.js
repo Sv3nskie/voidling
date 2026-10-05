@@ -1,7 +1,7 @@
 // Voidling core: math helpers, input, audio, glow sprites
 (() => {
   const V = (window.V = window.V || {});
-  V.VERSION = '0.1.2'; // shown on the title screen, so bug reports can say which build
+  V.VERSION = '0.1.3'; // shown on the title screen, so bug reports can say which build
 
   // The tower swaps V.random for its own seeded generator while it builds levels
   V.random = Math.random;

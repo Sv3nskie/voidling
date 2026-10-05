@@ -103,7 +103,14 @@
   }
 
   // The market stall on the shop island: striped awning, a trader alien behind the counter, a sign
-  V.drawShop = (ctx, x, y, t, used) => {
+  V.drawShop = (ctx, x, y, t, used, scale = 1) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    stall(ctx, 0, 0, t, used);
+    ctx.restore();
+  };
+  function stall(ctx, x, y, t, used) {
     V.drawGlow(ctx, x, y - 86, 34, '#ffcc4d', used ? 0.15 : 0.45 + 0.2 * Math.sin(t * 3));
     ctx.fillStyle = '#3a1f4a';
     ctx.fillRect(x - 31, y - 66, 4, 66);
