@@ -39,9 +39,6 @@
     g.fillStyle = gr;
     g.fillRect(0, 0, 128, 128);
   }
-  const PIXEL = document.createElement('canvas');
-  PIXEL.width = PIXEL.height = 1;
-  const PIXEL_G = PIXEL.getContext('2d', { willReadFrequently: true });
   // The shaded body of an island's 3D slab: its sprite with the grassy cap painted one flat,
   // slightly darker grass color (the lit top surface, smooth when the copies stack up) and the
   // rock darkened down its sides. Made once per sprite.
@@ -49,15 +46,10 @@
     if (spr.slab) return spr.slab;
     const c = document.createElement('canvas');
     c.width = spr.canvas.width; c.height = spr.canvas.height;
-    const g = c.getContext('2d'), k = c.height / spr.sh;
+    const g = c.getContext('2d'), k = c.height / spr.sh, capH = spr.capH;
     g.drawImage(spr.canvas, 0, 0);
-    // Cap color, read from the middle of the cap just below its highlight stripe
-    const w = spr.sw / 1.1, depth = spr.sh - spr.oy - w * 0.04, capH = Math.min(w * 0.07, depth * 0.22); // as in makeIslandSprite
-    PIXEL_G.clearRect(0, 0, 1, 1);
-    PIXEL_G.drawImage(spr.canvas, Math.floor(c.width * 0.5), Math.floor((spr.oy + capH * 0.25) * k), 1, 1, 0, 0, 1, 1);
-    const [r, gr, b] = PIXEL_G.getImageData(0, 0, 1, 1).data;
     g.globalCompositeOperation = 'source-atop';
-    g.fillStyle = `rgb(${Math.round(r * 0.78)},${Math.round(gr * 0.78)},${Math.round(b * 0.82)})`;
+    g.fillStyle = V.mixHex(spr.cap, '#1a0830', 0.24);
     g.fillRect(0, 0, c.width, (spr.oy + capH * 0.7) * k);
     const rock = g.createLinearGradient(0, (spr.oy + capH * 0.7) * k, 0, c.height);
     rock.addColorStop(0, 'rgba(22,8,44,0.55)');
@@ -527,7 +519,7 @@
         for (const p of this.plats) {
           if (p.fallen || !vis(p.x + p.w / 2, p.y + p.depth / 2, p.w + 40)) continue;
           const dx = V.clamp((cx - p.x - p.w / 2) * 0.03, -11, 11), dy = V.clamp((cy - p.y) * 0.045, -11, 11);
-          const n = Math.min(9, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 1.2));
+          const n = Math.min(3, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 3)); // ≤ 3 copies: cheap on phones
           const back = slab(p.spr), ox = p.crumbleT > 0 ? Math.sin(t * 70) * (1 + (1 - p.crumbleT / 0.9) * 3) : 0;
           for (let i = n; i >= 1; i--) ctx.drawImage(back, p.x - p.spr.ox + ox + dx * i / n, p.y - p.spr.oy + p.fallY + dy * i / n, p.spr.sw, p.spr.sh);
         }

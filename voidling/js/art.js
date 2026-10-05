@@ -107,7 +107,7 @@
     g.beginPath();
     g.roundRect(w * 0.02, -capH * 0.45, w * 0.96, capH * 0.32, capH * 0.16);
     g.fill();
-    return { canvas: c, ox: padX, oy: padTop, sw: w + padX * 2, sh: c.height / ppu };
+    return { canvas: c, ox: padX, oy: padTop, sw: w + padX * 2, sh: c.height / ppu, capH, cap: pal.top };
   };
 
   // ---------- Planet sprite: shaded sphere with bands, craters and an atmosphere ----------
@@ -305,21 +305,19 @@
 
       // Light shafts falling through the sky: warm in the canyon, cold up in space
       if (V.settings.fx) {
-        const cool = V.clamp(alt / 500, 0, 1);
+        const cool = V.clamp((alt - 150) / 250, 0, 1); // warm → cold between 150 and 400 m
         ctx.save();
         const base = ctx.getTransform();
         ctx.globalCompositeOperation = 'lighter';
         for (let i = 0; i < 4; i++) {
           const x = W * (0.1 + i * 0.27) + Math.sin(t * 0.06 + i * 2.1) * W * 0.04;
-          const bw = Math.max(W, H) * (0.07 + (i % 2) * 0.05), len = Math.max(W, H) * 1.1;
+          const bw = Math.min(W, H) * (0.14 + (i % 2) * 0.1), len = H * 0.95;
           const a = (0.07 + 0.03 * Math.sin(t * 0.25 + i * 1.7)) * (1 - cool * 0.45);
           ctx.setTransform(base);
           ctx.translate(x, -H * 0.08);
           ctx.rotate(0.32 + i * 0.03);
-          ctx.globalAlpha = a * (1 - cool);
-          ctx.drawImage(this.rays[0], -bw / 2, 0, bw, len);
-          ctx.globalAlpha = a * cool;
-          ctx.drawImage(this.rays[1], -bw / 2, 0, bw, len);
+          if (cool < 1) { ctx.globalAlpha = a * (1 - cool); ctx.drawImage(this.rays[0], -bw / 2, 0, bw, len); }
+          if (cool > 0) { ctx.globalAlpha = a * cool; ctx.drawImage(this.rays[1], -bw / 2, 0, bw, len); }
         }
         ctx.restore();
       }

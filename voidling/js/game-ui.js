@@ -395,7 +395,7 @@
     V.drawVoid(ctx, G.voidY, box.x0, box.x1, box.y1, t, P.buffs.freeze > 0, G.surge.k);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    V.fx.world(ctx, W, H, cam, z, t); // foreground haze + bloom
+    V.fx.world(ctx, W, H, cam, z, t); // foreground haze
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = `16px ${FONT_D}`;
     for (const u of G.tower.popups) {
@@ -423,7 +423,6 @@
     vg.addColorStop(1, close ? `rgba(110,0,50,${0.55 + 0.2 * Math.sin(t * 8)})` : 'rgba(5,2,15,0.55)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, W, H);
-    V.fx.grain(ctx, t);
     V.fx.letterbox(ctx, W, H, G.bars);
     // HUD: scaled down on small screens, bottom kept clear for touch buttons
     G.ui = V.clamp(Math.min(W / 900, H / 640), 0.62, 1);
@@ -475,7 +474,7 @@
     updateWind(dt);
     G.overT += dt;
   }
-  G.step = step; // lets tests drive the game loop frame by frame
+  G.step = step; G.render = render; // lets tests drive the game loop frame by frame
   G.bars = 0.085; G.fade = 1; G.intro = -1;
 
   // Title screen: the camera cranes slowly up the tower and back down behind the menu,
@@ -497,7 +496,8 @@
 
   let last = performance.now();
   function frame(now) {
-    const dt = Math.min(0.033, (now - last) / 1000);
+    // Below ~40 fps the frame is split into two steps, so a slow device never plays in slow motion
+    const raw = Math.min(0.05, (now - last) / 1000), steps = raw > 0.026 ? 2 : 1, dt = raw / steps;
     last = now;
     V.pollPad();
     const I = V.input;
@@ -506,7 +506,10 @@
     if (G.menu.update()) I.endFrame();
     else if (G.state === 'play' && !G.paused && I.hit('pause')) G.setPaused(true);
     if (G.state === 'shop') G.shopInput();
-    if (!G.paused) { G.t += dt; step(dt); }
+    for (let i = 0; i < steps && !G.paused; i++) {
+      G.t += dt; step(dt);
+      I.endFrame(); // a press counts once, not once per step
+    }
     render();
     I.endFrame();
     requestAnimationFrame(frame);
