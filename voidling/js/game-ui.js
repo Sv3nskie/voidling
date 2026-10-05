@@ -518,7 +518,35 @@
   G.canvas.addEventListener('pointerdown', () => { if (G.paused) G.paused = false; });
   $('playBtn').addEventListener('click', start);
   $('againBtn').addEventListener('click', start);
-  document.querySelectorAll('#touch button').forEach(b => {
+  // ◀ ▶ work like a slider: the side of the pad under your thumb is the direction, so you can
+  // slide from one to the other without lifting (and keep running if you slide past the edge)
+  const dpad = touchEl.querySelector('.pad');
+  const thumbs = new Map(); // pointerId -> 'left' | 'right'
+  const dirAt = x => {
+    const [l, r] = [...dpad.querySelectorAll('button')].map(b => b.getBoundingClientRect());
+    return x < (l.left + l.width / 2 + r.left + r.width / 2) / 2 ? 'left' : 'right';
+  };
+  const dpadSync = () => {
+    const held = new Set(thumbs.values());
+    for (const a of ['left', 'right']) {
+      if (held.has(a)) V.input.press(a); else V.input.release(a);
+      dpad.querySelector(`[data-act="${a}"]`).classList.toggle('on', held.has(a));
+    }
+  };
+  dpad.addEventListener('pointerdown', e => {
+    e.preventDefault(); V.audio.init();
+    try { dpad.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+    thumbs.set(e.pointerId, dirAt(e.clientX)); dpadSync();
+  });
+  dpad.addEventListener('pointermove', e => {
+    if (!thumbs.has(e.pointerId)) return;
+    const d = dirAt(e.clientX);
+    if (d !== thumbs.get(e.pointerId)) { thumbs.set(e.pointerId, d); dpadSync(); }
+  });
+  const dpadOff = e => { if (thumbs.delete(e.pointerId)) dpadSync(); };
+  dpad.addEventListener('pointerup', dpadOff);
+  dpad.addEventListener('pointercancel', dpadOff);
+  document.querySelectorAll('#touch .pad.grid button').forEach(b => {
     const act = b.dataset.act;
     const on = e => { e.preventDefault(); V.audio.init(); V.input.press(act); };
     const off = e => { e.preventDefault(); V.input.release(act); };

@@ -156,7 +156,9 @@ body.touch.playing #pauseBtn { display: grid; }
   #touch button.big { width: 64px; height: 64px; }
 }
 #touch button { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
-#touch button:active { background: rgba(185, 140, 255, 0.35); }
+#touch button:active, #touch button.on { background: rgba(185, 140, 255, 0.35); }
+#touch .pad:first-child button:active { background: rgba(11, 5, 24, 0.45); } /* the d-pad lights the side you hold, not the one you first touched */
+#touch .pad:first-child button.on { background: rgba(185, 140, 255, 0.35); }
 @media (prefers-reduced-motion: reduce) { .play { transition: none; } }
 </style>
 
