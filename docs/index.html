@@ -104,6 +104,29 @@ body {
   padding: 4px 7px;
 }
 .best { margin: 0; font-size: 0.9rem; color: var(--muted); letter-spacing: 0.08em; }
+
+/* Trading post: item cards in a grid, the selected one outlined in gold */
+.shop-card { max-width: 46rem; width: 100%; }
+.shop-title { margin: 0; font: 400 clamp(1.4rem, 5vw, 2rem)/1.1 var(--font-display); color: var(--gold); text-shadow: 0 0 18px rgba(255, 204, 77, 0.45); }
+.shop-title span { color: var(--ink); }
+.shop-coins { margin: 0; font: 400 1.2rem/1 var(--font-display); color: var(--gold); }
+.shop-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; }
+@media (max-width: 560px) { .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.shop-item {
+  display: grid; justify-items: center; gap: 4px; min-width: 0;
+  padding: 10px 8px 12px;
+  border: 2px solid rgba(185, 140, 255, 0.3); border-radius: 16px;
+  background: rgba(58, 20, 112, 0.35);
+  color: var(--ink); font-family: var(--font-body); cursor: pointer;
+  touch-action: manipulation;
+}
+.shop-item canvas { width: 48px; height: 48px; }
+.shop-item strong { font: 400 0.85rem/1.1 var(--font-display); }
+.shop-item span { font-size: 0.8rem; color: var(--muted); line-height: 1.25; text-wrap: balance; }
+.shop-item em { font-style: normal; font: 400 0.85rem/1 var(--font-display); color: var(--gold); }
+.shop-item.sel { border-color: var(--gold); box-shadow: 0 0 18px rgba(255, 204, 77, 0.35); }
+.shop-item.off { opacity: 0.45; }
+.shop-item:focus-visible { outline: 3px solid var(--crystal); outline-offset: 2px; }
 .rules { display: grid; gap: 8px; margin: 2px 0 4px; padding: 0; list-style: none; text-align: left; font-size: 1rem; color: var(--muted); }
 .rules li { display: flex; align-items: center; gap: 12px; }
 .rules b { color: var(--ink); font-weight: 600; }
@@ -170,8 +193,8 @@ body.touch.playing #pauseBtn { display: grid; }
       <li><kbd>←</kbd> <kbd>→</kbd> run</li>
       <li><kbd>Space</kbd> jump, again to double jump</li>
       <li>hold <kbd>Space</kbd> float</li>
-      <li><kbd>Shift</kbd> chomp-dash</li>
-      <li><kbd>J</kbd> throw / shoot (auto-aims, or use the mouse)</li>
+      <li><kbd>Shift</kbd> throw / shoot (auto-aims, or use the mouse)</li>
+      <li><kbd>X</kbd> chomp-dash</li>
       <li><kbd>G</kbd> grapple</li>
       <li>Gamepad: right stick aims</li>
       <li><kbd>P</kbd> pause</li>
@@ -179,6 +202,7 @@ body.touch.playing #pauseBtn { display: grid; }
       <li><kbd>M</kbd> sound</li>
     </ul>
     <p class="best" id="bestTitle"></p>
+    <p class="best" id="versionTag"></p>
   </div>
 </section>
 
@@ -202,6 +226,17 @@ body.touch.playing #pauseBtn { display: grid; }
 
 <button id="pauseBtn" type="button" aria-label="Pause">II</button>
 
+<section class="screen" id="shop" hidden>
+  <div class="card shop-card">
+    <h2 class="shop-title">Trading post <span id="shopHeight"></span></h2>
+    <p class="tag">Spend your coins. The Void waits while you shop.</p>
+    <p class="shop-coins" id="shopCoins"></p>
+    <div class="shop-grid" id="shopGrid"></div>
+    <button class="play" id="shopClose" type="button">Keep climbing</button>
+    <p class="best">Arrows choose · Space buys · Esc leaves</p>
+  </div>
+</section>
+
 <div id="touch" aria-hidden="true">
   <div class="pad"><button data-act="left">◀</button><button data-act="right">▶</button></div>
   <div class="pad grid"><button data-act="thook">HOOK</button><button data-act="tshoot">SHOOT</button><button data-act="chomp">CHOMP</button><button class="big" data-act="jump">JUMP</button></div>
@@ -215,6 +250,7 @@ body.touch.playing #pauseBtn { display: grid; }
 <script src="js/game.js"></script>
 <script src="js/weapons.js"></script>
 <script src="js/buffs.js"></script>
+<script src="js/shop.js"></script>
 <script src="js/game-ui.js"></script>
 <script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js'));</script>
 </body>

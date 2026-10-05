@@ -9,7 +9,7 @@
     { text: 'Move with [←] [→] or [A] [D]', done: g => g.count('move') > 0.6 },
     { text: 'Press [SPACE] to jump. Press it again in the air to double jump', done: g => g.count('djump') > 0 },
     { text: 'Jump ON an alien to defeat it and bounce up high', done: g => g.count('stomp') > 0, wait: 30 },
-    { text: 'Press [SHIFT] to chomp-dash. It hits enemies and works once in the air', done: g => g.count('dash') > 0 },
+    { text: 'Press [X] to chomp-dash. It hits enemies and works once in the air', done: g => g.count('dash') > 0 },
     { text: 'Hold [SPACE] while falling to float down slowly', done: g => g.count('glide') > 0.5, wait: 25 },
   ];
 
@@ -61,20 +61,21 @@
         if (!near(p.x + p.w / 2, p.y)) continue;
         if (p.type === 'crumble') this.show('crumble', 'Cracked platforms crumble right after you land. Keep moving!');
         else if (p.spikes) this.show('spikes', 'Red crystal spikes hurt. Don\'t land on them.');
+        else if (p.shop && !p.shopUsed && !this.seen.shop) this.show('shop', 'A trader! Land on this island to spend your coins.');
         else if (p.beacon && !p.lit) this.show('beacon', 'Beacons are checkpoints. Land on one for +1 heart, and it pushes the Void back down.');
         else if (p.type === 'moving') this.show('moving', 'Moving platforms carry you along. Time your jump.');
         if (this.tip) return;
       }
       if (this.api.wind.phase !== 'calm') this.show('wind', 'Wind gust! It pushes you sideways, especially in the air.');
       if (this.tip) return;
-      if (P.held && V.GUNS[P.held.type] && !this.api.touch) this.show('recoil', 'In the air, hold [↓] and press [J] to shoot down and boost yourself up!');
+      if (P.held && V.GUNS[P.held.type] && !this.api.touch) this.show('recoil', 'In the air, hold [↓] and press [SHIFT] to shoot down and boost yourself up!');
       if (this.tip) return;
       for (const it of tower.items) {
         if (it.dead || !near(it.x, it.y)) continue;
         if (it.type === 'diamond') this.show('diamond', 'A diamond! Grab it: if you die, it brings you back to your last checkpoint.');
-        else if (it.type === 'rock') this.show('rock', 'Walk over a rock to pick it up, then press [J] to throw. It auto-aims at the nearest enemy.');
+        else if (it.type === 'rock') this.show('rock', 'Walk over a rock to pick it up, then press [SHIFT] to throw. It auto-aims at the nearest enemy.');
         else if (it.type === 'bomb') this.show('bomb', 'Void bomb! The blast launches you too. Throw it near your feet for a huge jump.');
-        else if (V.GUNS[it.type]) this.show('gun', 'A gun! Grab it, then hold [J] to shoot. It auto-aims at the nearest enemy.');
+        else if (V.GUNS[it.type]) this.show('gun', 'A gun! Grab it, then hold [SHIFT] to shoot. It auto-aims at the nearest enemy.');
         else if (V.BUFFS[it.type]) this.show('buff', 'A power-up! They hide in hard-to-reach spots. Grab it if you can.');
         if (this.tip) return;
       }
@@ -89,7 +90,7 @@
       // On phones, name the on-screen buttons instead of keyboard keys
       if (tipText && this.api.touch) {
         tipText = tipText.replace('[←] [→] or [A] [D]', '[◀] [▶]').replace(/\[SPACE\]/g, '[JUMP]')
-          .replace(/\[SHIFT\]/g, '[CHOMP]').replace(/\[J\]/g, '[SHOOT]').replace(/\[G\]/g, '[HOOK]');
+          .replace(/\[X\]/g, '[CHOMP]').replace(/\[SHIFT\]/g, '[SHOOT]').replace(/\[G\]/g, '[HOOK]');
       }
       if (tipText) this.drawTip(ctx, tipText, W, H, this.tip ? '#ffcc4d' : '#5fe3ff');
     }

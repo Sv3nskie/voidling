@@ -13,6 +13,7 @@
   resize();
 
   const M = V.M, HALF = V.HALF, R = 12;
+  const KILL_COINS = { walker: 2, bat: 3, spiky: 4, maw: 4, saucer: 10 };
   const PH = { G: 1500, JUMP: 430, DJUMP: 370, STOMP: 480, RUN: 175, ACC_G: 2200, ACC_A: 1200, DASH: 540, DASH_T: 0.15, MAXFALL: 720, GLIDE: 170 };
   const STORY = {
     1: ['GLORP COLONY', 'A Voidling? Up here? Somebody stop it!', '#9dff6b'],
@@ -68,8 +69,9 @@
     G.tower.reset();
     G.tower.init(G.ppu());
     G.P = freshPlayer(0, -R);
+    G.P.diamonds = 1; // every run starts with one revive
     Object.assign(G, { voidY: 320, voidDelay: 4, saucerT: 12, thunderT: 4, checkpoint: null, banner: null, shake: 0, freeze: 0, flash: 0 });
-    Object.assign(G, { surge: { phase: 'calm', t: 30, k: 0 }, lastBest: 0, stallT: 0, stallMul: 1 });
+    Object.assign(G, { surge: { phase: 'calm', t: 30, k: 0 }, lastBest: 0, stallT: 0, stallMul: 1, chain: 0, chainT: -9 });
     Object.assign(G.wind, { phase: 'calm', t: 3, power: 0, streaks: [] });
     G.flags = {};
     G.shots = []; G.blasts = [];
@@ -160,6 +162,7 @@
           P.y = p.y - r; P.vy = 0; P.onGround = true; P.plat = p;
           if (p.type === 'crumble' && p.crumbleT < 0) p.crumbleT = 0.9;
           if (p.beacon && !p.touched) G.lightBeacon(p, true);
+          if (p.shop && !p.shopUsed && G.state === 'play') G.openShop(p);
           break;
         }
       }
@@ -221,10 +224,18 @@
     if (how === 'stomp') V.sfx.stomp();
     T.burst(ex, ey, 18, e.color || (e.type === 'maw' ? '#e0233f' : e.type === 'bat' ? '#8a4dff' : '#f0ecff'), 4, 200);
     T.popup(ex, ey - 24, { stomp: 'STOMP!', dash: 'CHOMP!', shot: 'POW!' }[how], '#ffd86b');
+    // Kills pay coins (spent at the trader); quick kills in a row add a chain bonus
+    G.chain = G.t - G.chainT < 3 ? G.chain + 1 : 1;
+    G.chainT = G.t;
+    const bonus = Math.min(G.chain - 1, 5), pay = (KILL_COINS[e.type] || 2) + bonus;
+    P.coins += pay;
+    T.popup(ex, ey - 46, bonus ? `+${pay} COINS  ·  CHAIN x${G.chain}` : `+${pay} COINS`, '#ffcc4d');
+    T.burst(ex, ey, 8, '#ffcc4d', 3, 140);
+    V.sfx.coin();
     if (e.type === 'saucer' && V.chance(0.6)) T.addItem(V.chance(0.5) ? 'spread' : 'blaster', ex, ey);
     else if (V.chance(0.12)) T.addItem('heart', ex, ey - 10);
-    else if (V.chance(0.5)) T.addItem('coin', ex, ey - 10);
     G.once('kill', () => G.say('GLORP COLONY', 'It took out Gary! Somebody help Gary!', '#9dff6b'));
+    G.guide.show('coins', 'Enemies drop coins. Spend them at the trader every 100 m.');
   });
   G.interact = () => {
     const P = G.P, T = G.tower, r = R;
@@ -275,6 +286,7 @@
       }
     }
     for (const it of T.items) {
+      if (G.state !== 'play') break; // died earlier this frame: no pickups
       if (it.dead || Math.hypot(P.x - it.x, P.y - it.y) > r + it.a + 4) continue;
       if (it.type === 'diamond') {
         if (P.diamonds >= 3) { G.once('diamondsFull', () => T.popup(it.x, it.y - 20, 'DIAMONDS FULL (3/3)', '#9ff3ff')); continue; }

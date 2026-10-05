@@ -64,15 +64,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
   }
 
-  // Back button: pauses a running game; pressed again (paused, or on a menu) it leaves the app
+  // Back button: the game decides (closes the shop, or pauses a running game); when it has
+  // nothing to close it answers 'exit' and the app closes
   Future<void> _onBack() async {
-    final running = await _web.runJavaScriptReturningResult(
-        "String(!!(window.V && V.G && V.G.state === 'play' && !V.G.paused))");
-    if (running.toString().contains('true')) {
-      await _web.runJavaScript('V.G.pause()');
-    } else {
-      await SystemNavigator.pop();
-    }
+    final result = await _web.runJavaScriptReturningResult(
+        "(window.V && V.G && V.G.back) ? V.G.back() : 'exit'");
+    if (!result.toString().contains('handled')) await SystemNavigator.pop();
   }
 
   @override

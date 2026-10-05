@@ -1,6 +1,7 @@
 // Voidling core: math helpers, input, audio, glow sprites
 (() => {
   const V = (window.V = window.V || {});
+  V.VERSION = '0.1.2'; // shown on the title screen, so bug reports can say which build
 
   // The tower swaps V.random for its own seeded generator while it builds levels
   V.random = Math.random;
@@ -40,8 +41,8 @@
     ArrowRight: 'right', KeyD: 'right',
     ArrowUp: ['jump', 'up'], KeyW: ['jump', 'up'], Space: 'jump', KeyZ: 'jump',
     ArrowDown: 'down', KeyS: 'down',
-    ShiftLeft: 'chomp', ShiftRight: 'chomp', KeyX: 'chomp', KeyK: 'chomp',
-    KeyJ: 'shoot', KeyE: 'shoot', KeyF: 'shoot',
+    ShiftLeft: 'shoot', ShiftRight: 'shoot', KeyE: 'shoot',
+    KeyX: 'chomp', KeyC: 'chomp', KeyK: 'chomp',
     KeyG: 'hook', KeyQ: 'hook',
     KeyM: 'mute', KeyP: 'pause', Escape: 'pause', Enter: 'start',
   };

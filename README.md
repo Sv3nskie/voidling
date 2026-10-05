@@ -6,6 +6,9 @@ A 2D arcade climber in space. You are a Voidling, a small scrap of living void, 
 
 Everyone climbs the same tower, so heights are comparable between players.
 
+- **Diamonds** hide in hard-to-reach spots. Hold up to 3: when you die, one brings you back to your last checkpoint.
+- **Coins** come from islands and from defeating enemies (quick kills chain for a bonus). Spend them at the **trading post** every 100 m on hearts, shields, weapons, power-ups and diamonds.
+
 - **Play in your browser:** https://sv3nskie.github.io/voidling/ (works on phones too; add it to your home screen to play offline)
 - **Android app:** download the APK from the [latest release](https://github.com/Sv3nskie/voidling/releases/latest)
 
@@ -15,8 +18,8 @@ Everyone climbs the same tower, so heights are comparable between players.
 |---|---|---|---|
 | Move | ← → or A D | Left stick / d-pad | ◀ ▶ |
 | Jump, double jump (hold to float) | Space / W / ↑ | A | JUMP |
-| Chomp-dash | Shift / X / K | B | CHOMP |
-| Throw / shoot (auto-aims) | J / E / F, or click to aim | X / RT, right stick aims | SHOOT |
+| Chomp-dash | X / C / K | B | CHOMP |
+| Throw / shoot (auto-aims) | Shift / E, or click to aim | X / RT, right stick aims | SHOOT |
 | Grapple hook | G / Q, or right-click | Y / LB | HOOK |
 | Drop through a platform | ↓ / S | Stick down | |
 | Pause | P / Esc | Start | II button |

@@ -154,6 +154,13 @@
         if (s.kind === 'bolt') { s.dead = true; continue; }
         s.vx *= -0.6; s.x = V.clamp(s.x, -V.HALF, V.HALF);
       }
+      // Islands stop your shots and throws too
+      if (T.solidAt(s.x, s.y)) {
+        if (s.kind === 'bolt') { s.dead = true; T.burst(s.x, s.y, 5, s.color, 3, 60); }
+        else if (s.kind === 'bomb') explode(s);
+        else shatter(s);
+        continue;
+      }
       for (const e of T.enemies) {
         if (e.dead || e.type === 'jelly' || e.hurtT > 0) continue;
         const [ex, ey] = enemyPos(e);
@@ -327,6 +334,6 @@
     ctx.fillText(gun ? `${gun.name}  ×${P.held.ammo}` : THROWN[P.held.type].name, x + 50, y + 7);
     ctx.fillStyle = '#b9a6d9'; ctx.font = `500 12px ${FONT_B}`;
     ctx.fillText(G.isTouch() ? (gun ? 'SHOOT auto-aims' : 'SHOOT auto-aims the throw')
-      : gun ? 'J auto-aims · hold ↑/↓ to aim' : 'J auto-aims the throw · or click', x + 50, y + 22);
+      : gun ? 'SHIFT auto-aims · hold ↑/↓ to aim' : 'SHIFT auto-aims the throw · or click', x + 50, y + 22);
   };
 })();

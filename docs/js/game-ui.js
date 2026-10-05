@@ -34,13 +34,13 @@
     setTimeout(() => {
       const s = Math.floor(P.time), zi = V.zoneAt(P.best);
       $('overTitle').textContent = reason;
-      $('overLine').textContent = DEATH_LINES[zi];
+      $('overLine').textContent = `${DEATH_LINES[zi]} No diamonds left, so you start again from the bottom.`;
       $('oHeight').textContent = P.best + ' m';
       $('oZone').textContent = V.ZONES[zi].name;
       $('oKills').textContent = P.kills;
       $('oCoins').textContent = P.coins;
       $('oTime').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-      $('bestOver').textContent = (isBest ? 'New best height!' : `Best: ${G.best} m`) + '  ·  Tip: diamonds bring you back to your last checkpoint';
+      $('bestOver').textContent = (isBest ? 'New best height!' : `Best: ${G.best} m`) + '  ·  Collect diamonds to respawn at your last checkpoint';
       $('over').hidden = false;
       $('againBtn').focus();
     }, 900);
@@ -175,7 +175,13 @@
     label('BEST', rx, pad, 'right');
     ctx.fillStyle = '#f4eaff'; ctx.font = `20px ${FONT_D}`;
     ctx.fillText(`${Math.max(G.best, P.best)} m`, rx, pad + 14);
-    label(`COINS ${P.coins}   ·   KILLS ${P.kills}`, rx, pad + 42, 'right', '#ffd86b');
+    // Coins buy things at the trader: big gold count with a coin icon, kills underneath
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillStyle = '#ffcc4d'; ctx.font = `18px ${FONT_D}`;
+    const coinText = String(P.coins);
+    ctx.fillText(coinText, rx, pad + 40);
+    V.drawFood(ctx, { type: 'coin', x: rx - ctx.measureText(coinText).width - 13, y: pad + 50, a: 8, phase: 0 }, t);
+    label(`KILLS ${P.kills}`, rx, pad + 64, 'right');
 
     // How far below you the Void is, and whether it is surging or speeding up
     const dist = Math.max(0, Math.floor((G.voidY - P.y - G.R) / M));
@@ -326,7 +332,7 @@
     const tb = G.touchBox; // centered HUD only needs to dodge the buttons when they leave no room between them
     G.reserve = tb ? (tb.gap > 330 ? 10 : tb.center) / G.ui : 0;
     G.reserveLeft = tb ? tb.left / G.ui : 0;
-    if (G.state === 'play' || G.state === 'reviving') {
+    if (G.state === 'play' || G.state === 'reviving' || G.state === 'shop') {
       ctx.setTransform(dpr * G.ui, 0, 0, dpr * G.ui, 0, 0);
       drawHud();
       if (G.state === 'reviving') drawRevive(); else { G.guide.draw(ctx); drawStory(); }
@@ -343,12 +349,13 @@
 
   // ---------- Loop & flow ----------
   function step(dt) {
+    if (G.state === 'shop') return; // the world waits while you shop
     if (G.state === 'play') {
       if (G.freeze > 0) { G.freeze -= dt; return; } // hit-stop
       G.updatePlayer(dt);
-      G.interact();
-      G.updateWeapons(dt);
-      G.updateBuffs(dt);
+      if (G.state === 'play') G.interact(); // nothing else happens on the frame you die
+      if (G.state === 'play') G.updateWeapons(dt);
+      if (G.state === 'play') G.updateBuffs(dt);
       if (G.state === 'play') G.updateVoid(dt);
       if (G.state === 'play') G.updateMeta(dt);
       G.guide.update(dt);
@@ -375,6 +382,7 @@
     if (I.hit('mute')) V.audio.toggleMute();
     if (G.state === 'play' && I.hit('pause')) G.paused = !G.paused;
     if (G.state === 'title' && I.hit('start')) start();
+    if (G.state === 'shop') G.shopInput();
     if (G.state === 'dead' && G.overT > 1.6 && I.hit('start')) start();
     if (!G.paused) { G.t += dt; step(dt); }
     render();
@@ -410,6 +418,12 @@
   // Pause: the touch button, the Android back button (via G.pause from the app), or P / Esc;
   // a tap anywhere resumes
   G.pause = () => { if (G.state === 'play') G.paused = true; };
+  // Android back button: closes the shop, or pauses a running game; otherwise the app may exit
+  G.back = () => {
+    if (G.state === 'shop') { G.closeShop(); return 'handled'; }
+    if (G.state === 'play' && !G.paused) { G.paused = true; return 'handled'; }
+    return 'exit';
+  };
   $('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (G.state === 'play') G.paused = !G.paused; });
   G.canvas.addEventListener('pointerdown', () => { if (G.paused) G.paused = false; });
   $('playBtn').addEventListener('click', start);
@@ -428,6 +442,7 @@
   const boot = data => {
     if (data && data.best) G.best = Math.max(G.best, data.best);
     if (G.best > 0) $('bestTitle').textContent = `Best height: ${G.best} m`;
+    $('versionTag').textContent = 'v' + V.VERSION;
     G.newRun();
     G.state = 'title';
     requestAnimationFrame(frame);
