@@ -65,7 +65,7 @@ knocked flying by a dash, spiraling bats, exploding UFOs, wilting plants.
 | `rock` | 18 tall |
 | `bomb` | 22 tall |
 | `gun_blaster`, `gun_spread` (or one `gun`) | 24 wide, pointing right, held at the grip |
-| `buff_shield`, `buff_boots`, `buff_wings`, `buff_hook`, `buff_freeze`, `buff_heartup` | 24 tall, shown inside a glass bubble and in the HUD |
+| `buff_shield`, `buff_boots`, `buff_wings`, `buff_freeze`, `buff_heartup` | 24 tall, shown inside a glass bubble and in the HUD |
 
 ## Shooting and effects
 

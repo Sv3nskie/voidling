@@ -62,7 +62,7 @@
     // (what the Void measures against); diamonds = revives, max 3
     hearts: 3, maxHearts: 5, best: 0, peak: 0, diamonds: 0, coins: 0, kills: 0, time: 0, zone: 0, trail: [], fireCd: 0,
     bag: { blaster: 0, spread: 0, rock: 0, bomb: 0 }, sel: null, // inventory and the selected item
-    buffs: { shield: 0, boots: 0, wings: 0, freeze: 0 }, hooks: 0, hook: null, rescue: null,
+    buffs: { shield: 0, boots: 0, wings: 0, freeze: 0 }, rescue: null,
   });
 
   G.newRun = () => {
@@ -91,7 +91,7 @@
     else { G.tower.reset(); G.tower.init(G.ppu()); }
     G.P = Object.assign(freshPlayer(x, y), {
       best: old.best, peak: G.meters(y), diamonds: old.diamonds, coins: old.coins, kills: old.kills, time: old.time,
-      bag: { ...old.bag }, sel: old.sel, hooks: old.hooks, // you keep everything you carry and your hooks
+      bag: { ...old.bag }, sel: old.sel, // you keep everything you carry
       zone: cp ? cp.zone : 0, inv: 2, maxHearts: old.maxHearts, hearts: 3, spawnT: 0.4, // reforms from sparkles
     });
     G.tower.flash(x, y, 34);
@@ -132,7 +132,7 @@
     if (I.hit('jump')) P.jumpBuf = 0.13;
     P.jumpBuf -= dt; P.coyote -= dt;
     const jumpMul = P.buffs.boots > 0 ? 1.22 : 1, maxJumps = P.buffs.wings > 0 ? 3 : 2;
-    if (P.jumpBuf > 0 && !P.hook) {
+    if (P.jumpBuf > 0) {
       if (P.coyote > 0) {
         P.vy = -PH.JUMP * jumpMul; P.coyote = 0; P.jumpBuf = 0; P.jumps = 1; P.onGround = false; P.squash = -0.25;
         T.puff(P.x, P.y + r, 2, 1, 7);
@@ -164,7 +164,6 @@
     P.vy = Math.min(P.vy + g * dt, PH.MAXFALL);
     P.gliding = !P.onGround && P.dashT <= 0 && I.down('jump') && P.vy > PH.GLIDE;
     if (P.gliding) { P.vy = PH.GLIDE; G.guide.event('glide', dt); }
-    if (P.hook) G.hookPull(dt);
 
     const oldBottom = P.y + r;
     P.x += P.vx * dt; P.y += P.vy * dt;
@@ -406,7 +405,7 @@
       const s = (line - p.y) + Math.abs(p.x + p.w / 2 - P.x) * 0.6;
       if (s < bs) { bs = s; best = p; }
     }
-    P.vx = 0; P.vy = 0; P.hook = null; P.dashT = 0; P.onGround = false;
+    P.vx = 0; P.vy = 0; P.dashT = 0; P.onGround = false;
     P.inv = Math.max(P.inv, 1.8);
     G.voidY += 100;
     V.sfx.bounce();

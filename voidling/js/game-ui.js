@@ -105,7 +105,7 @@
     // Look further down when falling fast, and follow tighter when moving fast. Both ease in
     // and out so landing never snaps the view.
     const fall = V.clamp((P.vy - 250) / 450, 0, 1) * v.h * 0.18;
-    const fast = Math.abs(P.vy) > 300 || P.rescue || P.hook;
+    const fast = Math.abs(P.vy) > 300 || P.rescue;
     cam.lead = V.damp(cam.lead || 0, fall, 4, dt);
     cam.st = V.damp(cam.st || 0.3, fast ? 0.12 : 0.3, 5, dt);
     const tx = v.w >= HALF * 2 + 40 ? 0 : V.clamp(P.x, -HALF - 20 + v.w / 2, HALF + 20 - v.w / 2);
@@ -150,7 +150,7 @@
   function drawFallGuide() {
     const P = G.P, I = V.input, PH = G.PH, R = G.R;
     G.fallGuide = null;
-    if (P.onGround || P.vy < 120 || P.rescue || P.hook || G.hold) return;
+    if (P.onGround || P.vy < 120 || P.rescue || G.hold) return;
     const dir = I.axis || (I.down('right') ? 1 : 0) - (I.down('left') ? 1 : 0);
     let x = P.x, y = P.y, vx = P.vx, vy = P.vy, land = null;
     const path = [];
@@ -535,7 +535,7 @@
       if (G.freeze > 0) { G.freeze -= dt; return; } // hit-stop
       if (G.hold) { // after a respawn: wait for the first control press
         const I = V.input;
-        if (['left', 'right', 'down'].some(a => I.down(a)) || ['jump', 'chomp', 'shoot', 'click', 'hook', 'rclick', 'tshoot', 'thook'].some(a => I.hit(a))) G.hold = false;
+        if (['left', 'right', 'down'].some(a => I.down(a)) || ['jump', 'chomp', 'shoot', 'click', 'tshoot'].some(a => I.hit(a))) G.hold = false;
         else G.P.inv = Math.max(G.P.inv, 0.2);
       }
       G.updatePlayer(dt);
@@ -680,6 +680,7 @@
     if (G.state === 'play' && !G.paused) { G.setPaused(true); return 'handled'; }
     return G.state === 'title' ? 'exit' : 'handled';
   };
+  G.canvas.addEventListener('contextmenu', e => e.preventDefault()); // no browser menu on right-click
   $('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); G.setPaused(!G.paused); });
   // ◀ ▶ slider: where your thumb lands is the still point, so resting it moves nothing. Slide
   // left or right from there to run: slowly at first, full speed SLIDE_DEAD + SLIDE_RANGE px
@@ -719,9 +720,9 @@
   slider.addEventListener('pointercancel', sliderOff);
   G.releaseTouch = () => { // no stuck direction or lit button after a pause or death
     sliderOff();
-    touchEl.querySelectorAll('.pad.grid button.on').forEach(b => { b.classList.remove('on'); V.input.release(b.dataset.act); });
+    touchEl.querySelectorAll('.pad.acts button.on').forEach(b => { b.classList.remove('on'); V.input.release(b.dataset.act); });
   };
-  document.querySelectorAll('#touch .pad.grid button').forEach(b => {
+  document.querySelectorAll('#touch .pad.acts button').forEach(b => {
     const act = b.dataset.act;
     const on = e => { e.preventDefault(); V.audio.init(); V.input.press(act); b.classList.add('on'); };
     const off = e => { e.preventDefault(); V.input.release(act); b.classList.remove('on'); };
@@ -731,16 +732,14 @@
     b.addEventListener('pointerleave', off);
   });
 
-  // HOOK and SHOOT show how many you have and dim when there's nothing to use
-  const hookBtn = touchEl.querySelector('[data-act="thook"]'), shootBtn = touchEl.querySelector('[data-act="tshoot"]');
-  let touchSig = '';
+  // SHOOT shows how many shots / stones you have and dims when there's nothing to use
+  const shootBtn = touchEl.querySelector('[data-act="tshoot"]');
+  let touchSig = null; // null: not drawn yet, so the first frame always sets it
   G.syncTouch = () => {
     if (G.state !== 'play' || !G.isTouch()) return;
-    const P = G.P, held = G.held(), sig = `${P.hooks}|${held ? held.type + held.ammo : ''}`;
+    const held = G.held(), sig = held ? held.type + held.ammo : '';
     if (sig === touchSig) return;
     touchSig = sig;
-    hookBtn.classList.toggle('off', !P.hooks);
-    if (P.hooks) hookBtn.dataset.n = P.hooks; else delete hookBtn.dataset.n;
     shootBtn.classList.toggle('off', !held);
     if (held) shootBtn.dataset.n = held.ammo; else delete shootBtn.dataset.n;
   };

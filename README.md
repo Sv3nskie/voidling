@@ -19,12 +19,11 @@ Everyone climbs the same tower, so heights are comparable between players.
 
 | Action | Keyboard | Gamepad | Touch |
 |---|---|---|---|
-| Move | ← → or A D | Left stick / d-pad | ◀ ▶ |
+| Move | ← → or A D | Left stick / d-pad | ◀ ▶ slider: thumb down, then slide |
 | Jump, double jump (hold to float) | Space / W / ↑ | A | JUMP |
-| Chomp-dash | X / C / K | B | CHOMP |
+| Chomp-dash | X / C / K | B | |
 | Throw / shoot (auto-aims) | Shift / E, or click to aim | X / RT, right stick aims | SHOOT |
-| Switch item | R / Tab / 1-4, mouse wheel, or click the item bar | RB | Tap the item bar |
-| Grapple hook | G / Q, or right-click | Y / LB | HOOK |
+| Switch item | R / Tab / 1-4, mouse wheel, or click the item bar | RB / LB / Y | Tap the item bar |
 | Drop through a platform | ↓ / S | Stick down | |
 | Pause | P / Esc | Start | II button |
 

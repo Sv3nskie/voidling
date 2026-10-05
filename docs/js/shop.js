@@ -14,14 +14,13 @@
     blaster: { name: 'Star Blaster', price: 20, desc: '+18 rapid shots', ok: P => P.bag.blaster < V.CAP.blaster || 'You carry the most', give: () => G.tryPickup(offerItem('blaster')) },
     spread: { name: 'Spread Gun', price: 30, desc: '+10 triple shots', ok: P => P.bag.spread < V.CAP.spread || 'You carry the most', give: () => G.tryPickup(offerItem('spread')) },
     bomb: { name: 'Void Bomb', price: 15, desc: '+1 bomb: big blast that launches you up', ok: P => P.bag.bomb < V.CAP.bomb || 'You carry the most', give: () => G.tryPickup(offerItem('bomb')) },
-    hook: { name: '4 Grapple Hooks', price: 20, desc: 'Pull yourself up to a platform', ok: P => P.hooks < 9 || 'Hooks are full', give: () => G.tryBuff(offerItem('hook')) },
     wings: { name: 'Wings', price: 20, desc: 'Triple jump for 25 s', ok: () => true, give: () => G.tryBuff(offerItem('wings')) },
     boots: { name: 'Super Jump', price: 20, desc: 'Jump 50% higher for 25 s', ok: () => true, give: () => G.tryBuff(offerItem('boots')) },
     freeze: { name: 'Void Freeze', price: 25, desc: 'Stops the Void for 12 s', ok: () => true, give: () => G.tryBuff(offerItem('freeze')) },
   };
   // Heart, shield and diamond are always for sale, plus 3 rotating items. Seeded by the shop
   // number, so every player sees the same offers at the same height.
-  const ROTATING = ['blaster', 'spread', 'bomb', 'hook', 'wings', 'boots', 'freeze'];
+  const ROTATING = ['blaster', 'spread', 'bomb', 'wings', 'boots', 'freeze'];
   function offers(n) {
     const rnd = V.rng(4242 + n * 97), pool = ROTATING.slice(), picks = [];
     while (picks.length < 3) picks.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);

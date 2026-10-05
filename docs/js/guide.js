@@ -9,7 +9,7 @@
     { text: 'Move with [←] [→] or [A] [D]', done: g => g.count('move') > 0.6 },
     { text: 'Press [SPACE] to jump. Press it again in the air to double jump', done: g => g.count('djump') > 0 },
     { text: 'Jump ON an alien to defeat it and bounce up high', done: g => g.count('stomp') > 0, wait: 30 },
-    { text: 'Press [X] to chomp-dash. It hits enemies and works once in the air', done: g => g.count('dash') > 0 },
+    { text: 'Press [X] to chomp-dash. It hits enemies and works once in the air', done: g => g.count('dash') > 0, keys: true }, // no dash button on phones
     { text: 'Hold [SPACE] while falling to float down slowly', done: g => g.count('glide') > 0.5, wait: 25 },
   ];
 
@@ -26,10 +26,11 @@
     }
     count(name) { return this.counts[name] || 0; }
     event(name, amount = 1) { this.counts[name] = this.count(name) + amount; }
-    show(key, text) {
+    // touchText: what to say instead on phones (there's no chomp-dash button there)
+    show(key, text, touchText) {
       if (this.seen[key] || this.tip) return;
       this.seen[key] = true;
-      this.tip = { text, t: 6 };
+      this.tip = { text: this.api.touch && touchText ? touchText : text, t: 6 };
     }
 
     update(dt) {
@@ -38,7 +39,7 @@
       this.stepT += dt;
       while (this.step < TUTORIAL.length) {
         const s = TUTORIAL[this.step];
-        if (!s.done(this) && !(s.wait && this.stepT > s.wait)) break;
+        if (!s.done(this) && !(s.wait && this.stepT > s.wait) && !(s.keys && this.api.touch)) break;
         this.step++;
         this.stepT = 0;
       }
@@ -50,11 +51,11 @@
       else if (P.hearts === 1) this.show('lastHeart', 'Last heart! Defeated enemies sometimes drop hearts.');
       for (const e of tower.enemies) {
         if (e.dead || !near(e.x, e.y)) continue;
-        if (e.type === 'spiky') this.show('spiky', 'Spiky aliens hurt if you jump on them. Chomp-dash them from the side!');
+        if (e.type === 'spiky') this.show('spiky', 'Spiky aliens hurt if you jump on them. Chomp-dash them from the side!', 'Spiky aliens hurt if you jump on them. Shoot them or throw a stone!');
         else if (e.type === 'jelly') this.show('jelly', 'Space jellies are bounce pads. Land on one to launch up high!');
-        else if (e.type === 'maw') this.show('maw', 'Carnivorous plants bite when you get close. Stomp, dash, shoot or throw a rock at them!');
-        else if (e.type === 'bat') this.show('bat', 'Void bats swoop at you. Jump on them or chomp-dash them.');
-        else if (e.type === 'saucer') this.show('saucer', 'UFO! It glows red before it shoots. Jump on it, dash into it or shoot it: one hit takes it down.');
+        else if (e.type === 'maw') this.show('maw', 'Carnivorous plants bite when you get close. Stomp, dash, shoot or throw a rock at them!', 'Carnivorous plants bite when you get close. Stomp, shoot or throw a stone at them!');
+        else if (e.type === 'bat') this.show('bat', 'Void bats swoop at you. Jump on them or chomp-dash them.', 'Void bats swoop at you. Jump on them or shoot them.');
+        else if (e.type === 'saucer') this.show('saucer', 'UFO! It glows red before it shoots. Jump on it, dash into it or shoot it: one hit takes it down.', 'UFO! It glows red before it shoots. Jump on it or shoot it: one hit takes it down.');
         if (this.tip) return;
       }
       for (const p of tower.plats) {
@@ -80,7 +81,7 @@
         else if (V.BUFFS[it.type]) this.show('buff', 'A power-up! They hide in hard-to-reach spots. Grab it if you can.');
         if (this.tip) return;
       }
-      if (tower.clouds.some(c => near(c.x, c.y, 380, 260))) this.show('secret', 'That dark cloud by the edge hides a secret power-up. Jump, double jump and air-dash to reach it!');
+      if (tower.clouds.some(c => near(c.x, c.y, 380, 260))) this.show('secret', 'That dark cloud by the edge hides a secret power-up. Jump, double jump and air-dash to reach it!', 'That dark cloud by the edge hides a secret power-up. Jump, double jump and float to reach it!');
     }
 
     // ---------- Drawing (screen space) ----------
@@ -91,7 +92,7 @@
       // On phones, name the on-screen buttons instead of keyboard keys
       if (tipText && this.api.touch) {
         tipText = tipText.replace('with [←] [→] or [A] [D]', 'with the [◀ ▶] slider').replace(/\[SPACE\]/g, '[JUMP]')
-          .replace(/\[X\]/g, '[CHOMP]').replace(/\[SHIFT\]/g, '[SHOOT]').replace(/\[G\]/g, '[HOOK]').replace(/\[R\]/g, '[ITEM BAR]');
+          .replace(/\[SHIFT\]/g, '[SHOOT]').replace(/\[R\]/g, '[ITEM BAR]');
       }
       if (tipText) this.drawTip(ctx, tipText, W, H, this.tip ? '#ffcc4d' : '#5fe3ff');
     }

@@ -625,9 +625,8 @@
     return V.art.pick(...PLAYER_STATES[st].map(s => 'player_' + s), 'player_idle', 'player');
   };
 
-  V.drawPlayer = (ctx, P, t) => {
+  const drawPlayerBody = (ctx, P, t) => {
     const r = P.r;
-    if (P.inv > 0 && Math.floor(t * 20) % 2 === 0) return;
     const spawn = V.clamp(P.spawnT === undefined ? 1 : 1 - P.spawnT / 0.4, 0, 1); // reforming after a revive
     const grow = spawn < 1 ? 0.2 + 0.8 * (1 + 2.2 * Math.pow(spawn - 1, 3) + 1.2 * Math.pow(spawn - 1, 2)) : 1;
     const art = playerArt(P, t);
@@ -667,5 +666,18 @@
       }
     }
     ctx.restore();
+  };
+  // Protected moments, without hard blinking: while the world waits after a (re)spawn a calm
+  // glass bubble surrounds the Voidling; after a hit it pulses softly until it can be hit again
+  V.drawPlayer = (ctx, P, t) => {
+    const waiting = V.G && V.G.hold && V.G.state === 'play', a0 = ctx.globalAlpha;
+    if (P.inv > 0 && !waiting) ctx.globalAlpha = a0 * (0.45 + 0.55 * (0.5 + 0.5 * Math.cos(t * 11)));
+    drawPlayerBody(ctx, P, t);
+    ctx.globalAlpha = a0;
+    if (waiting) {
+      ctx.globalAlpha = a0 * 0.85;
+      V.gloss.draw(ctx, V.gloss.bubble('#9ff3ff'), P.x, P.y, P.r * 1.75 * (1 + 0.04 * Math.sin(t * 3)), 56);
+      ctx.globalAlpha = a0;
+    }
   };
 })();
