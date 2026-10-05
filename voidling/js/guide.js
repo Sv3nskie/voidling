@@ -62,7 +62,7 @@
         if (p.type === 'crumble') this.show('crumble', 'Cracked platforms crumble right after you land. Keep moving!');
         else if (p.spikes) this.show('spikes', 'Red crystal spikes hurt. Don\'t land on them.');
         else if (p.shop && !p.shopUsed && !this.seen.shop) this.show('shop', 'A trader! Land on this island to spend your coins.');
-        else if (p.beacon && !p.lit) this.show('beacon', 'Beacons are checkpoints. Land on one for +1 heart, and it pushes the Void back down.');
+        else if (p.beacon && !p.lit) this.show('beacon', 'Beacons are checkpoints. Land on one to save it: +1 heart, and it pushes the Void back down.');
         else if (p.type === 'moving') this.show('moving', 'Moving platforms carry you along. Time your jump.');
         if (this.tip) return;
       }

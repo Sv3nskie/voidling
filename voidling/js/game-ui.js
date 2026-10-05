@@ -16,6 +16,7 @@
   G.die = reason => {
     const P = G.P;
     document.body.classList.remove('playing');
+    G.releaseTouch();
     G.tower.burst(P.x, P.y, 50, '#8a4dff', 5, 300, 0, 1.2);
     G.shake = 18;
     V.sfx.boom();
@@ -40,10 +41,9 @@
       $('oKills').textContent = P.kills;
       $('oCoins').textContent = P.coins;
       $('oTime').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-      $('bestOver').textContent = (isBest ? 'New best height!' : `Best: ${G.best} m`) + '  ·  Collect diamonds to respawn at your last checkpoint';
-      $('over').hidden = false;
-      $('againBtn').focus();
-    }, 900);
+      $('bestOver').textContent = isBest ? 'New best height!' : `Best height: ${G.best} m`;
+      if (G.state === 'dead') G.menu.show('over');
+    }, 1100);
   };
 
   // The revive moment: "DIAMOND USED", the diamonds you have left, and where you go back to
@@ -288,17 +288,19 @@
       ctx.fillText(w.phase === 'gust' ? 'WIND' : 'WIND INCOMING', x, y + 44);
     }
 
-    // Right after a respawn the world waits for you
-    if (G.hold && G.state === 'play') {
-      ctx.globalAlpha = 0.7 + 0.3 * Math.sin(t * 5);
+    // Right after a respawn (or the start) the world waits for you
+    if (G.hold && G.state === 'play' && G.intro <= 0) {
+      ctx.globalAlpha = (0.7 + 0.3 * Math.sin(t * 5)) * V.clamp(-G.intro * 3, 0, 1);
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.shadowColor = '#5fe3ff'; ctx.shadowBlur = 16;
       ctx.fillStyle = '#e0fdff'; ctx.font = `${Math.min(34, W / 16)}px ${FONT_D}`;
       ctx.fillText('MOVE TO START', W / 2, H * 0.36);
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
+      ctx.globalAlpha = V.clamp(-G.intro * 3, 0, 1);
       ctx.fillStyle = '#b9a6d9'; ctx.font = `500 16px ${FONT_B}`;
       ctx.fillText('Nothing attacks and the Void waits until you move', W / 2, H * 0.36 + 34);
+      ctx.globalAlpha = 1;
     }
     // A saucer still above the screen: red "UFO" marker at the top edge so it never surprises you
     for (const e of G.tower.enemies) {
@@ -313,16 +315,24 @@
       ctx.fillText('UFO', x, y + 8);
       ctx.globalAlpha = 1;
     }
-    if (G.banner) {
-      const b = G.banner;
-      ctx.globalAlpha = V.clamp(Math.min(b.t * 2, (2.6 - b.t) * 4), 0, 1);
+    if (G.banner) { // zone title card: kicker between hairlines, the name, and a line that draws out
+      const b = G.banner, age = 2.6 - b.t;
+      ctx.globalAlpha = V.clamp(Math.min(b.t * 2, age * 4), 0, 1);
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#5fe3ff'; ctx.font = `16px ${FONT_D}`;
-      ctx.fillText(b.sub, W / 2, H * 0.3 - 40);
-      ctx.shadowColor = '#b98cff'; ctx.shadowBlur = 24;
+      ctx.fillStyle = '#5fe3ff'; ctx.font = `15px ${FONT_D}`;
+      const sub = b.sub.split('').join(String.fromCharCode(8202)), sw = ctx.measureText(sub).width;
+      ctx.fillText(sub, W / 2, H * 0.3 - 44);
+      ctx.fillRect(W / 2 - sw / 2 - 52, H * 0.3 - 44, 38, 1.5);
+      ctx.fillRect(W / 2 + sw / 2 + 14, H * 0.3 - 44, 38, 1.5);
+      ctx.shadowColor = '#b98cff'; ctx.shadowBlur = 28;
       ctx.fillStyle = '#f4eaff'; ctx.font = `${Math.min(60, W / 12)}px ${FONT_D}`;
       ctx.fillText(b.text, W / 2, H * 0.3);
       ctx.shadowBlur = 0;
+      const lw = Math.min(W * 0.5, 420) * V.clamp(age * 1.6, 0, 1);
+      const lg = ctx.createLinearGradient(W / 2 - lw / 2, 0, W / 2 + lw / 2, 0);
+      lg.addColorStop(0, 'rgba(185,140,255,0)'); lg.addColorStop(0.5, 'rgba(185,140,255,0.9)'); lg.addColorStop(1, 'rgba(185,140,255,0)');
+      ctx.fillStyle = lg;
+      ctx.fillRect(W / 2 - lw / 2, H * 0.3 + 38, lw, 2);
       ctx.globalAlpha = 1;
     }
   }
@@ -366,10 +376,11 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const v = G.view();
     G.bg.draw(ctx, W, H, t, Math.max(0, -(cam.y + v.h / 2) / M)); // exact height, not whole meters, so it moves smoothly
-    const z = cam.zoom, sx = (Math.random() - 0.5) * G.shake, sy = (Math.random() - 0.5) * G.shake;
+    const shake = V.settings.shake ? G.shake : 0;
+    const z = cam.zoom, sx = (Math.random() - 0.5) * shake, sy = (Math.random() - 0.5) * shake;
     ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (W / 2 - cam.x * z + sx), dpr * (H / 2 - cam.y * z + sy));
     const box = { x0: cam.x - v.w / 2, x1: cam.x + v.w / 2, y0: cam.y - v.h / 2, y1: cam.y + v.h / 2 };
-    drawShaftEdges(box);
+    if (G.state !== 'title') drawShaftEdges(box); // the flyover shows the open sky
     G.tower.draw(ctx, t, box, P);
     G.drawShots(ctx);
     if (G.state === 'play') { drawLandingShadow(); drawFallGuide(); }
@@ -384,6 +395,7 @@
     V.drawVoid(ctx, G.voidY, box.x0, box.x1, box.y1, t, P.buffs.freeze > 0, G.surge.k);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    V.fx.world(ctx, W, H, cam, z, t); // foreground haze + bloom
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = `16px ${FONT_D}`;
     for (const u of G.tower.popups) {
@@ -411,6 +423,8 @@
     vg.addColorStop(1, close ? `rgba(110,0,50,${0.55 + 0.2 * Math.sin(t * 8)})` : 'rgba(5,2,15,0.55)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, W, H);
+    V.fx.grain(ctx, t);
+    V.fx.letterbox(ctx, W, H, G.bars);
     // HUD: scaled down on small screens, bottom kept clear for touch buttons
     G.ui = V.clamp(Math.min(W / 900, H / 640), 0.62, 1);
     G.HW = W / G.ui; G.HH = H / G.ui;
@@ -423,13 +437,7 @@
       if (G.state === 'reviving') drawRevive(); else { G.guide.draw(ctx); drawStory(); }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    if (G.paused) {
-      ctx.fillStyle = 'rgba(11,5,24,0.5)'; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#f4eaff'; ctx.font = `48px ${FONT_D}`; ctx.textAlign = 'center';
-      ctx.fillText('PAUSED', W / 2, H / 2);
-      ctx.font = `500 18px ${FONT_B}`;
-      ctx.fillText(G.isTouch() ? 'Tap to resume' : 'Press P to resume', W / 2, H / 2 + 44);
-    }
+    V.fx.fade(ctx, W, H, G.fade);
   }
 
   // ---------- Loop & flow ----------
@@ -454,7 +462,12 @@
     }
     if (G.state === 'reviving' && (G.revive.t += dt) > 2.4) cont(); // diamond revive: back to the checkpoint
     G.tower.update(dt, G.t, G.P, G.hold);
-    updateCamera(dt);
+    if (G.state === 'title') updateFlyover(dt); else updateCamera(dt);
+    // Cinematic bars on the title, the run-over screen, revives and zone title cards
+    const bars = G.state === 'title' || G.state === 'dead' ? 0.085 : G.state === 'reviving' ? 0.075 : G.banner ? 0.055 : 0;
+    G.bars = V.damp(G.bars, bars, 4, dt);
+    G.fade = Math.max(0, G.fade - dt * 1.1);
+    G.intro -= dt;
     G.shake = Math.max(0, G.shake - dt * 30);
     G.flash = Math.max(0, G.flash - dt);
     updateStory(dt);
@@ -463,17 +476,36 @@
     G.overT += dt;
   }
   G.step = step; // lets tests drive the game loop frame by frame
+  G.bars = 0.085; G.fade = 1; G.intro = -1;
+
+  // Title screen: the camera cranes slowly up the tower and back down behind the menu,
+  // with the world shifted right on wide screens to make room for the menu
+  function updateFlyover(dt) {
+    const cam = G.cam, f = G.flyover || (G.flyover = { t: 0 });
+    f.t += dt;
+    const ox = cam.x, oy = cam.y;
+    const k = (1 - Math.cos(f.t * Math.PI * 2 / 90)) / 2; // 0 → 1 → 0 over 90 s
+    cam.zoom = V.damp(cam.zoom, G.targetZoom() * 1.04, 3, dt);
+    const v = G.view(), wide = G.W > G.H * 1.15;
+    const tx = (wide ? -v.w * 0.17 : 0) + Math.sin(f.t * 0.12) * 30;
+    const ty = -v.h * (wide ? 0.1 : 0.04) - k * 120 * M;
+    [cam.x, cam.vx] = smooth(cam.x, tx, cam.vx || 0, 1.4, dt);
+    [cam.y, cam.vy] = smooth(cam.y, ty, cam.vy || 0, 1.4, dt);
+    G.bg.scroll((cam.x - ox) * cam.zoom, (cam.y - oy) * cam.zoom);
+    G.tower.generate(cam.y - v.h * 1.5);
+  }
+
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(0.033, (now - last) / 1000);
     last = now;
     V.pollPad();
     const I = V.input;
-    if (I.hit('mute')) V.audio.toggleMute();
-    if (G.state === 'play' && I.hit('pause')) G.paused = !G.paused;
-    if (G.state === 'title' && I.hit('start')) start();
+    if (I.hit('mute')) { V.audio.toggleMute(); G.menu.sync(); }
+    // Menus take the keyboard / gamepad while open; the press that closes one doesn't reach the game
+    if (G.menu.update()) I.endFrame();
+    else if (G.state === 'play' && !G.paused && I.hit('pause')) G.setPaused(true);
     if (G.state === 'shop') G.shopInput();
-    if (G.state === 'dead' && G.overT > 1.6 && I.hit('start')) start();
     if (!G.paused) { G.t += dt; step(dt); }
     render();
     I.endFrame();
@@ -489,35 +521,55 @@
   addEventListener('resize', () => G.measureTouch());
   addEventListener('touchstart', () => setTimeout(G.measureTouch, 50), { once: true, passive: true });
 
-  function start() {
+  // A new climb. From the title the camera swoops down from the flyover to the Voidling.
+  G.start = () => {
     G.measureTouch();
     V.audio.init();
-    $('title').hidden = true;
-    $('over').hidden = true;
+    G.menu.hide('title', true); G.menu.hide('over', true); G.menu.hide('pauseMenu');
+    const from = G.state === 'title' ? { x: G.cam.x, y: G.cam.y } : null;
     G.newRun();
-    G.state = 'play'; G.paused = false;
+    if (from) Object.assign(G.cam, from, { vx: 0, vy: 0 });
+    else G.fade = 0.8;
+    G.state = 'play'; G.paused = false; G.overT = 0;
+    document.body.classList.remove('paused');
+    G.hold = true; G.intro = from ? 1.3 : 0.5; // the world waits until you move
     document.body.classList.add('playing');
-  }
+  };
   function cont() {
     V.audio.init();
-    $('over').hidden = true;
     G.continueRun();
-    G.state = 'play'; G.paused = false;
+    G.state = 'play'; G.paused = false; G.intro = -1;
     document.body.classList.add('playing');
   }
-  // Pause: the touch button, the Android back button (via G.pause from the app), or P / Esc;
-  // a tap anywhere resumes
-  G.pause = () => { if (G.state === 'play') G.paused = true; };
-  // Android back button: closes the shop, or pauses a running game; otherwise the app may exit
-  G.back = () => {
-    if (G.state === 'shop') { G.closeShop(); return 'handled'; }
-    if (G.state === 'play' && !G.paused) { G.paused = true; return 'handled'; }
-    return 'exit';
+  // Back to the title screen (your best height is kept)
+  G.toMenu = () => {
+    const P = G.P;
+    if (P && P.best > G.best) { G.best = P.best; try { localStorage.setItem('voidling.climb.best', String(G.best)); } catch (e) { /* storage blocked */ } }
+    document.body.classList.remove('playing');
+    G.releaseTouch();
+    G.newRun();
+    G.state = 'title'; G.paused = false; G.flyover = null; G.fade = 1;
+    document.body.classList.remove('paused');
+    G.menu.hide('pauseMenu'); G.menu.hide('over');
+    G.menu.show('title');
   };
-  $('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (G.state === 'play') G.paused = !G.paused; });
-  G.canvas.addEventListener('pointerdown', () => { if (G.paused) G.paused = false; });
-  $('playBtn').addEventListener('click', start);
-  $('againBtn').addEventListener('click', start);
+  // Pause: the touch button, the Android back button (via G.pause from the app), or P / Esc
+  G.setPaused = on => {
+    if (G.state !== 'play' && on) return;
+    G.paused = on;
+    document.body.classList.toggle('paused', on);
+    if (on) { G.releaseTouch(); G.menu.show('pauseMenu'); } else G.menu.hide('pauseMenu');
+  };
+  G.pause = () => G.setPaused(true);
+  // Android back button: closes a panel or the shop, resumes from pause, pauses a running game,
+  // leaves the run-over screen; on the title it lets the app exit
+  G.back = () => {
+    if (G.menu.back()) return 'handled';
+    if (G.state === 'shop') { G.closeShop(); return 'handled'; }
+    if (G.state === 'play' && !G.paused) { G.setPaused(true); return 'handled'; }
+    return G.state === 'title' ? 'exit' : 'handled';
+  };
+  $('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); G.setPaused(!G.paused); });
   // ◀ ▶ work like a slider: the side of the pad under your thumb is the direction, so you can
   // slide from one to the other without lifting (and keep running if you slide past the edge)
   const dpad = touchEl.querySelector('.pad');
@@ -544,6 +596,7 @@
     if (d !== thumbs.get(e.pointerId)) { thumbs.set(e.pointerId, d); dpadSync(); }
   });
   const dpadOff = e => { if (thumbs.delete(e.pointerId)) dpadSync(); };
+  G.releaseTouch = () => { if (thumbs.size) { thumbs.clear(); dpadSync(); } }; // no stuck direction after a pause or death
   dpad.addEventListener('pointerup', dpadOff);
   dpad.addEventListener('pointercancel', dpadOff);
   document.querySelectorAll('#touch .pad.grid button').forEach(b => {
@@ -559,10 +612,10 @@
   window.claude?.hot?.snapshot?.(() => ({ best: G.best }));
   const boot = data => {
     if (data && data.best) G.best = Math.max(G.best, data.best);
-    if (G.best > 0) $('bestTitle').textContent = `Best height: ${G.best} m`;
     $('versionTag').textContent = 'v' + V.VERSION;
     G.newRun();
     G.state = 'title';
+    G.menu.show('title');
     requestAnimationFrame(frame);
   };
   if (window.claude?.hot?.ready) window.claude.hot.ready(boot);

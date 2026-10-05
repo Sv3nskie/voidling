@@ -1,7 +1,13 @@
 // Voidling core: math helpers, input, audio, glow sprites
 (() => {
   const V = (window.V = window.V || {});
-  V.VERSION = '0.1.6'; // shown on the title screen, so bug reports can say which build
+  V.VERSION = '0.1.7'; // shown on the title screen, so bug reports can say which build
+
+  // ---------- Settings (saved on this device) ----------
+  // fx = cinematic effects (bloom, film grain, light rays, foreground haze); depth = 3D islands
+  V.settings = { sound: true, shake: true, fx: true, depth: true };
+  try { Object.assign(V.settings, JSON.parse(localStorage.getItem('voidling.settings')) || {}); } catch (e) { /* storage blocked */ }
+  V.saveSettings = () => { try { localStorage.setItem('voidling.settings', JSON.stringify(V.settings)); } catch (e) { /* storage blocked */ } };
 
   // The tower swaps V.random for its own seeded generator while it builds levels
   V.random = Math.random;
@@ -39,13 +45,13 @@
   const MAP = {
     ArrowLeft: 'left', KeyA: 'left',
     ArrowRight: 'right', KeyD: 'right',
-    ArrowUp: ['jump', 'up'], KeyW: ['jump', 'up'], Space: 'jump', KeyZ: 'jump',
+    ArrowUp: ['jump', 'up'], KeyW: ['jump', 'up'], Space: ['jump', 'ok'], KeyZ: 'jump',
     ArrowDown: 'down', KeyS: 'down',
     ShiftLeft: 'shoot', ShiftRight: 'shoot', KeyE: 'shoot',
     KeyX: 'chomp', KeyC: 'chomp', KeyK: 'chomp',
     KeyG: 'hook', KeyQ: 'hook',
     KeyR: 'cycle', Tab: 'cycle', Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4',
-    KeyM: 'mute', KeyP: 'pause', Escape: 'pause', Enter: 'start',
+    KeyM: 'mute', KeyP: 'pause', Escape: ['pause', 'back'], Backspace: 'back', Enter: ['start', 'ok'],
   };
   const actions = code => [].concat(MAP[code] || []);
   const press = a => { if (!keys.has(a)) pressed.add(a); keys.add(a); };
@@ -59,8 +65,8 @@
   addEventListener('blur', () => keys.clear());
   // ---------- Gamepad (standard layout: Xbox / PlayStation / Steam Deck) ----------
   // Left stick or d-pad moves, A jumps, B dashes, X or RT shoots, RB switches item, Y / LB / LT grapples,
-  // Start pauses, and the right stick aims in any direction.
-  const PAD = { 0: 'jump', 1: 'chomp', 2: 'shoot', 7: 'shoot', 5: 'cycle', 3: 'hook', 4: 'hook', 6: 'hook', 9: ['start', 'pause'], 12: 'up', 13: 'down', 14: 'left', 15: 'right' };
+  // Start pauses, and the right stick aims in any direction. In menus A selects and B goes back.
+  const PAD = { 0: ['jump', 'ok'], 1: ['chomp', 'back'], 2: 'shoot', 7: 'shoot', 5: 'cycle', 3: 'hook', 4: 'hook', 6: 'hook', 9: ['start', 'pause'], 12: 'up', 13: 'down', 14: 'left', 15: 'right' };
   const padHeld = new Set();
   V.pad = { ax: 0, ay: 0, aiming: false, connected: false };
   V.pollPad = () => {
@@ -95,7 +101,7 @@
   };
 
   // ---------- Audio (all synthesized, no files) ----------
-  let ac = null, master = null, noiseBuf = null, muted = false;
+  let ac = null, master = null, noiseBuf = null, muted = !V.settings.sound;
   const tone = (freq, dur = 0.12, type = 'sine', vol = 0.2, slide = 0, delay = 0) => {
     if (!ac) return;
     const t = ac.currentTime + Math.max(0, delay);
@@ -158,7 +164,12 @@
         startMusic();
       } catch (e) { ac = null; }
     },
-    toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.5; return muted; },
+    toggleMute() {
+      muted = !muted;
+      if (master) master.gain.value = muted ? 0 : 0.5;
+      V.settings.sound = !muted; V.saveSettings();
+      return muted;
+    },
     get muted() { return muted; },
   };
   V.sfx = {

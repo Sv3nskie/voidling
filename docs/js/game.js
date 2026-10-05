@@ -394,8 +394,8 @@
       G.tower.burst(P.x, P.y + R, 12, '#b98cff', 3, 120);
     }
   };
-  // A beacon becomes your checkpoint as soon as you climb past it (touched = false).
-  // Landing on it (touched = true) also gives a heart, pushes the Void back and stops a surge.
+  // Landing on a beacon's island makes it your checkpoint, gives a heart, pushes the Void back
+  // and stops a surge. Only landing counts: climbing past it does not.
   G.lightBeacon = (p, touched = true) => {
     const P = G.P, cx = p.x + p.w / 2;
     const first = !p.lit;
@@ -421,8 +421,6 @@
   G.updateMeta = dt => {
     const P = G.P, w = G.wind;
     P.time += dt;
-    // Climbing past a beacon saves it as your checkpoint, even without landing on it
-    for (const p of G.tower.plats) if (p.beacon && !p.lit && P.y < p.y - 40) G.lightBeacon(p, false);
     const zi = V.zoneAt(P.peak), z = V.ZONES[zi];
     if (zi > P.zone) {
       P.zone = zi;

@@ -201,6 +201,17 @@
         { x: 700, y: 1100, R: 110, spr: V.makePlanetSprite(110, 13, V.PLANET_PALS[2], 1) },
       ];
       this.canyons = [this.mesa(1700, 0.22, 11), this.mesa(1300, 0.13, 29)];
+      // Distant islands in two depth layers: small, blurred and sunk into the haze, so they read
+      // as far away scenery and never as platforms you could land on
+      this.far = [];
+      const rf = V.rng(4242);
+      [[11, 0.05, 34, 64, 0.3, 2.4], [7, 0.12, 64, 112, 0.42, 1.3]].forEach(([n, f, w0, w1, alpha, blur], layer) => {
+        for (let i = 0; i < n; i++) {
+          const w = w0 + rf() * (w1 - w0);
+          this.far.push({ f, alpha, x: rf() * 1800, y: rf() * 1500, bob: rf() * 6.28, spr: this.farIsland(w, 300 + layer * 50 + i, blur) });
+        }
+      });
+      this.rays = ['#ffb59a', '#9fb8ff'].map(c => this.ray(c));
       this.dust = [];
       for (let i = 0; i < 22; i++) this.dust.push({ x: Math.random() * 1600, y: Math.random() * 1000, s: V.rand(3, 9), r: Math.random() * 6 });
     }
@@ -213,6 +224,35 @@
         x += w * (0.8 + rnd() * 0.3);
       }
       return { pts, tileW, heightFrac };
+    }
+    farIsland(w, seed, blur) {
+      const spr = V.makeIslandSprite(w, w * 0.55, seed, V.ISLAND_PALS[seed % 4], 2);
+      const c = document.createElement('canvas'), m = 8;
+      c.width = spr.canvas.width + m * 2; c.height = spr.canvas.height + m * 2;
+      const g = c.getContext('2d');
+      g.filter = `blur(${blur}px)`;
+      g.drawImage(spr.canvas, m, m);
+      g.filter = 'none';
+      g.globalCompositeOperation = 'source-atop';
+      g.fillStyle = 'rgba(64,34,110,0.62)'; // haze
+      g.fillRect(0, 0, c.width, c.height);
+      return { canvas: c, w: c.width / 2, h: c.height / 2 };
+    }
+    // A soft light shaft: fades out across its width and along its length
+    ray(color) {
+      const c = document.createElement('canvas');
+      c.width = 64; c.height = 256;
+      const g = c.getContext('2d');
+      const across = g.createLinearGradient(0, 0, 64, 0);
+      across.addColorStop(0, color + '00'); across.addColorStop(0.5, color + 'ff'); across.addColorStop(1, color + '00');
+      g.fillStyle = across;
+      g.fillRect(0, 0, 64, 256);
+      g.globalCompositeOperation = 'destination-in';
+      const along = g.createLinearGradient(0, 0, 0, 256);
+      along.addColorStop(0, '#000000ff'); along.addColorStop(1, '#00000000');
+      g.fillStyle = along;
+      g.fillRect(0, 0, 64, 256);
+      return c;
     }
     scroll(dx, dy) { this.px += dx; this.py += dy; }
     // alt = camera altitude in meters
@@ -260,6 +300,37 @@
         const y = wrap(d.y - this.py * 0.03, 1600) - 300;
         ctx.globalAlpha = 0.85;
         for (let ox = x; ox < W + size; ox += 2400) ctx.drawImage(d.spr.canvas, ox, y - d.spr.ext, size, size);
+      }
+      ctx.globalAlpha = 1;
+
+      // Light shafts falling through the sky: warm in the canyon, cold up in space
+      if (V.settings.fx) {
+        const cool = V.clamp(alt / 500, 0, 1);
+        ctx.save();
+        const base = ctx.getTransform();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 4; i++) {
+          const x = W * (0.1 + i * 0.27) + Math.sin(t * 0.06 + i * 2.1) * W * 0.04;
+          const bw = Math.max(W, H) * (0.07 + (i % 2) * 0.05), len = Math.max(W, H) * 1.1;
+          const a = (0.07 + 0.03 * Math.sin(t * 0.25 + i * 1.7)) * (1 - cool * 0.45);
+          ctx.setTransform(base);
+          ctx.translate(x, -H * 0.08);
+          ctx.rotate(0.32 + i * 0.03);
+          ctx.globalAlpha = a * (1 - cool);
+          ctx.drawImage(this.rays[0], -bw / 2, 0, bw, len);
+          ctx.globalAlpha = a * cool;
+          ctx.drawImage(this.rays[1], -bw / 2, 0, bw, len);
+        }
+        ctx.restore();
+      }
+
+      // Distant islands, far layer first
+      for (const d of this.far) {
+        const x = wrap(d.x - this.px * d.f, 1800) - 120;
+        const y = wrap(d.y - this.py * d.f + Math.sin(t * 0.4 + d.bob) * 5, 1500) - 150;
+        if (y > H + 100) continue;
+        ctx.globalAlpha = d.alpha;
+        for (let ox = x; ox < W + 120; ox += 1800) ctx.drawImage(d.spr.canvas, ox - d.spr.w / 2, y - d.spr.h / 2, d.spr.w, d.spr.h);
       }
       ctx.globalAlpha = 1;
 

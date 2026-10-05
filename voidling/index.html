@@ -159,14 +159,180 @@ body.touch.playing #pauseBtn { display: grid; }
 #touch button:active, #touch button.on { background: rgba(185, 140, 255, 0.35); }
 #touch .pad:first-child button:active { background: rgba(11, 5, 24, 0.45); } /* the d-pad lights the side you hold, not the one you first touched */
 #touch .pad:first-child button.on { background: rgba(185, 140, 255, 0.35); }
-@media (prefers-reduced-motion: reduce) { .play { transition: none; } }
+body:not(.playing) #touch { visibility: hidden; }
+
+/* ---------- Menus: title, pause, run over. Text over the live game, no boxes ---------- */
+.menu {
+  position: fixed; inset: 0; z-index: 5;
+  display: grid; align-content: center; justify-items: start; gap: clamp(18px, 4vh, 40px);
+  padding: max(28px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom)) clamp(16px, 8vw, 128px);
+  overflow-y: auto;
+  background: linear-gradient(90deg, rgba(6, 2, 16, 0.94) 0%, rgba(6, 2, 16, 0.8) 34%, rgba(6, 2, 16, 0.35) 52%, rgba(6, 2, 16, 0) 68%);
+  animation: menuIn 0.6s ease both;
+}
+.menu.under { visibility: hidden; } /* a panel is open on top */
+body.paused #touch, body.paused #pauseBtn { visibility: hidden; }
+.menu.leaving { animation: menuOut 0.45s ease both; pointer-events: none; }
+@keyframes menuIn { from { opacity: 0; } }
+@keyframes menuOut { to { opacity: 0; transform: translateX(-24px); } }
+.menu-head, .menu-body { display: grid; justify-items: inherit; gap: 10px; }
+.menu-body { gap: 18px; }
+.kicker {
+  display: flex; align-items: center; gap: 12px; margin: 0;
+  font: 400 clamp(0.72rem, 1.6vw, 0.9rem)/1 var(--font-display); letter-spacing: 0.32em; text-transform: uppercase;
+  color: var(--crystal); text-shadow: 0 0 12px rgba(95, 227, 255, 0.6);
+}
+.kicker::before { content: ""; width: 34px; height: 1px; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.title-logo {
+  margin: 0; display: flex;
+  font: 400 clamp(3.1rem, 10.5vw, 8rem)/0.9 var(--font-display); letter-spacing: 0.01em;
+  /* Stacked hard shadows give the letters a carved, 3D edge; the last one is the glow */
+  filter: drop-shadow(0 2px 0 #5b2aa6) drop-shadow(0 2px 0 #41197e) drop-shadow(0 2px 0 #2a0d57) drop-shadow(0 3px 0 #160532) drop-shadow(0 0 26px rgba(185, 140, 255, 0.55));
+}
+.title-logo span {
+  display: inline-block;
+  background: linear-gradient(180deg, #ffffff 8%, #ecdcff 42%, #c39bff 66%, #ff8ccc 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: letterIn 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(0.25s + var(--i) * 70ms);
+}
+@keyframes letterIn { from { opacity: 0; transform: translateY(0.35em) scale(0.92); } }
+.menu-tag { margin: 0; max-width: 32rem; font-size: clamp(1rem, 2.4vw, 1.25rem); color: var(--muted); text-wrap: balance; }
+.menu-list { display: grid; justify-items: inherit; gap: 2px; margin-inline-start: -14px; }
+.menu-item {
+  position: relative;
+  padding: 9px 16px 9px 38px; border: 0; border-radius: 12px; background: none;
+  font: 400 clamp(1.25rem, 3vw, 1.75rem)/1.15 var(--font-display); letter-spacing: 0.04em; text-transform: uppercase;
+  color: rgba(214, 196, 245, 0.62);
+  cursor: pointer; touch-action: manipulation; text-align: start;
+  transition: color 0.18s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), text-shadow 0.2s ease;
+}
+.menu-item::before {
+  content: ""; position: absolute; left: 13px; top: 50%; width: 11px; height: 11px;
+  background: var(--crystal); box-shadow: 0 0 14px var(--crystal);
+  transform: translateY(-50%) rotate(45deg) scale(0); transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.menu-item.sel { color: #ffffff; text-shadow: 0 0 20px rgba(185, 140, 255, 0.9); transform: translateX(8px); }
+.menu-item.sel::before { transform: translateY(-50%) rotate(45deg) scale(1); }
+.menu-item:focus-visible { outline: none; }
+.menu-item.warn { color: var(--danger); text-shadow: 0 0 18px rgba(255, 79, 122, 0.7); }
+.menu-item.warn::before { background: var(--danger); box-shadow: 0 0 14px var(--danger); }
+.record { margin: 0; font: 400 0.95rem/1.3 var(--font-display); letter-spacing: 0.08em; color: var(--gold); text-shadow: 0 0 14px rgba(255, 204, 77, 0.45); }
+.record small { display: block; font: 600 0.8rem/1.3 var(--font-body); letter-spacing: 0.06em; color: var(--muted); text-shadow: none; }
+.menu-foot {
+  position: fixed; left: 0; right: 0; bottom: max(14px, env(safe-area-inset-bottom)); margin: 0;
+  display: flex; justify-content: space-between; padding-inline: clamp(16px, 4vw, 40px);
+  font-size: 0.8rem; letter-spacing: 0.1em; color: rgba(185, 166, 217, 0.6); pointer-events: none;
+}
+.only-touch { display: none !important; }
+body.touch .only-touch { display: flex !important; }
+body.touch .only-keys { display: none !important; }
+@media (pointer: coarse) { .only-touch { display: flex !important; } .only-keys { display: none !important; } }
+
+/* Pause and run over: centered over a darker scrim */
+.menu-center {
+  justify-items: center; text-align: center; padding-inline: 16px;
+  background: radial-gradient(ellipse at 50% 50%, rgba(6, 2, 16, 0.8), rgba(6, 2, 16, 0.94) 75%);
+}
+.menu-center .menu-list { margin-inline-start: 0; }
+.menu-center .menu-item { padding-inline: 38px; }
+.menu-center .menu-item.sel { transform: scale(1.06); }
+.menu-center .kicker::after { content: ""; width: 34px; height: 1px; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.over-title {
+  margin: 0; font: 400 clamp(1.9rem, 7vw, 4rem)/1 var(--font-display); color: #ffd6e0; text-wrap: balance;
+  text-shadow: 0 0 22px rgba(255, 79, 122, 0.8), 0 4px 0 #4a0c24;
+}
+#over .kicker { color: var(--danger); text-shadow: 0 0 12px rgba(255, 79, 122, 0.6); }
+
+/* Portrait phones: logo at the top, menu at the bottom, the game in between */
+@media (max-aspect-ratio: 1/1) {
+  #title {
+    align-content: space-between; justify-items: center; text-align: center; padding-inline: 16px;
+    padding-bottom: max(56px, calc(env(safe-area-inset-bottom) + 44px));
+    background: linear-gradient(180deg, rgba(6, 2, 16, 0.85) 0%, rgba(6, 2, 16, 0.25) 26%, rgba(6, 2, 16, 0) 40%, rgba(6, 2, 16, 0.2) 56%, rgba(6, 2, 16, 0.86) 74%, rgba(6, 2, 16, 0.96) 100%);
+  }
+  #title .menu-list { margin-inline-start: 0; }
+  #title .menu-item { padding-inline: 38px; }
+  #title .menu-item.sel { transform: scale(1.06); }
+  #title .kicker::after { content: ""; width: 34px; height: 1px; background: currentColor; box-shadow: 0 0 8px currentColor; }
+  .menu-foot { justify-content: center; }
+}
+
+/* Panels (How to play, Settings) open on top of any menu */
+.panel {
+  position: fixed; inset: 0; z-index: 6;
+  display: grid; place-items: center; padding: 16px; overflow-y: auto;
+  background: rgba(4, 1, 11, 0.55);
+  animation: menuIn 0.3s ease both;
+}
+.panel-card { width: 100%; max-width: 36rem; justify-items: center; background: rgba(11, 5, 24, 0.9); }
+.panel-title { margin: 0; font: 400 clamp(1.5rem, 5vw, 2.1rem)/1 var(--font-display); color: var(--ink); text-shadow: 0 0 18px rgba(185, 140, 255, 0.7); }
+.panel .menu-list { margin-inline-start: 0; justify-items: center; }
+.panel .menu-item.sel { transform: scale(1.05); }
+.settings { width: 100%; justify-items: stretch !important; }
+.settings .opt { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: clamp(1rem, 2.6vw, 1.2rem); }
+.settings .opt b {
+  font: 400 0.8rem/1 var(--font-display); letter-spacing: 0.1em; padding: 6px 10px; border-radius: 999px;
+  color: var(--void); background: var(--crystal); box-shadow: 0 0 12px rgba(95, 227, 255, 0.5);
+}
+.settings .opt.off b { color: var(--muted); background: rgba(185, 140, 255, 0.16); box-shadow: none; }
+.settings .menu-item.sel { transform: none; background: rgba(185, 140, 255, 0.1); }
+.settings [data-back] { justify-self: center; margin-top: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .play, .menu-item, .menu-item::before { transition: none; }
+  .menu, .panel, .title-logo span { animation: none; }
+}
 </style>
 
 <canvas id="game" aria-label="Voidling game"></canvas>
 
-<section class="screen" id="title">
-  <div class="card">
-    <h1 class="logo">VOIDLING</h1>
+<section class="menu" id="title">
+  <div class="menu-head">
+    <p class="kicker">The Void is rising</p>
+    <h1 class="title-logo" aria-label="Voidling"><span style="--i:0">V</span><span style="--i:1">O</span><span style="--i:2">I</span><span style="--i:3">D</span><span style="--i:4">L</span><span style="--i:5">I</span><span style="--i:6">N</span><span style="--i:7">G</span></h1>
+    <p class="menu-tag">Climb the floating isles. Don't look down.</p>
+  </div>
+  <div class="menu-body">
+    <nav class="menu-list" aria-label="Main menu">
+      <button class="menu-item" type="button" id="playBtn">Play</button>
+      <button class="menu-item" type="button" data-panel="howPanel">How to play</button>
+      <button class="menu-item" type="button" data-panel="setPanel">Settings</button>
+    </nav>
+    <p class="record" id="bestTitle" hidden></p>
+  </div>
+  <p class="menu-foot"><span id="versionTag"></span><span class="only-keys">↑ ↓ choose · Enter select</span></p>
+</section>
+
+<section class="menu menu-center" id="pauseMenu" hidden>
+  <div class="menu-body">
+    <p class="kicker">Paused</p>
+    <p class="menu-tag" id="pauseInfo"></p>
+    <nav class="menu-list" aria-label="Pause menu">
+      <button class="menu-item" type="button" id="resumeBtn">Resume</button>
+      <button class="menu-item" type="button" data-panel="howPanel">How to play</button>
+      <button class="menu-item" type="button" data-panel="setPanel">Settings</button>
+      <button class="menu-item" type="button" id="quitBtn">Main menu</button>
+    </nav>
+  </div>
+</section>
+
+<section class="panel" id="setPanel" hidden>
+  <div class="card panel-card">
+    <h2 class="panel-title">Settings</h2>
+    <nav class="menu-list settings" aria-label="Settings">
+      <button class="menu-item opt" type="button" data-set="sound">Sound <b></b></button>
+      <button class="menu-item opt" type="button" data-set="shake">Screen shake <b></b></button>
+      <button class="menu-item opt" type="button" data-set="fx">Cinematic effects <b></b></button>
+      <button class="menu-item opt" type="button" data-set="depth">3D islands <b></b></button>
+      <button class="menu-item" type="button" data-back>Back</button>
+    </nav>
+  </div>
+</section>
+
+<section class="panel" id="howPanel" hidden>
+  <div class="card panel-card">
+    <h2 class="panel-title">How to play</h2>
     <p class="tag">The Void is rising. <b>Climb as high as you can.</b> Everyone climbs the same tower, so compare heights with friends.</p>
     <ol class="rules">
       <li><span class="dot food"></span><span><b>Jump on aliens</b> to defeat them and bounce higher.</span></li>
@@ -174,10 +340,9 @@ body.touch.playing #pauseBtn { display: grid; }
       <li><span class="dot gun"></span><span><b>Collect stones, bombs and guns.</b> You carry them all: Shift uses the selected one, R switches.</span></li>
       <li><span class="dot power"></span><span><b>Find hidden power-ups:</b> shield, super jump, wings, grapple hook and more.</span></li>
       <li><span class="dot danger"></span><span><b>Spiky aliens and red spikes</b> hurt. You have 3 hearts.</span></li>
-      <li><span class="dot hunger"></span><span><b>Beacons are checkpoints.</b> Collect <b>diamonds</b>: when you die, one brings you back to your last checkpoint (hold up to 3).</span></li>
+      <li><span class="dot hunger"></span><span><b>Land on a beacon</b> to make it your checkpoint. Collect <b>diamonds</b>: when you die, one brings you back to your last checkpoint (hold up to 3).</span></li>
     </ol>
-    <button class="play" id="playBtn" type="button">Play</button>
-    <ul class="keys">
+    <ul class="keys only-keys">
       <li><kbd>←</kbd> <kbd>→</kbd> run</li>
       <li><kbd>Space</kbd> jump, again to double jump</li>
       <li>hold <kbd>Space</kbd> float</li>
@@ -190,15 +355,23 @@ body.touch.playing #pauseBtn { display: grid; }
       <li><kbd>↓</kbd> drop down</li>
       <li><kbd>M</kbd> sound</li>
     </ul>
-    <p class="best" id="bestTitle"></p>
-    <p class="best" id="versionTag"></p>
+    <ul class="keys only-touch">
+      <li><kbd>◀ ▶</kbd> run: slide your thumb between them</li>
+      <li><kbd>JUMP</kbd> again to double jump, hold to float</li>
+      <li><kbd>CHOMP</kbd> dash</li>
+      <li><kbd>SHOOT</kbd> uses your item, tap the item bar to switch</li>
+      <li><kbd>HOOK</kbd> grapple</li>
+      <li><kbd>II</kbd> pause</li>
+    </ul>
+    <nav class="menu-list"><button class="menu-item" type="button" data-back>Back</button></nav>
   </div>
 </section>
 
-<section class="screen" id="over" hidden>
-  <div class="card">
-    <h2 class="logo dead" id="overTitle">THE VOID GOT YOU</h2>
-    <p class="tag" id="overLine"></p>
+<section class="menu menu-center" id="over" hidden>
+  <div class="menu-body">
+    <p class="kicker">Run over</p>
+    <h2 class="over-title" id="overTitle">THE VOID GOT YOU</h2>
+    <p class="menu-tag" id="overLine"></p>
     <div class="stats">
       <div class="stat"><span>Height</span><strong id="oHeight">0 m</strong></div>
       <div class="stat"><span>Zone</span><strong id="oZone">THE CANYON</strong></div>
@@ -206,10 +379,11 @@ body.touch.playing #pauseBtn { display: grid; }
       <div class="stat"><span>Coins</span><strong id="oCoins">0</strong></div>
       <div class="stat"><span>Time</span><strong id="oTime">0:00</strong></div>
     </div>
-    <div class="actions">
-      <button class="play" id="againBtn" type="button">Restart from the bottom</button>
-    </div>
-    <p class="best" id="bestOver"></p>
+    <p class="record" id="bestOver"></p>
+    <nav class="menu-list" aria-label="Run over">
+      <button class="menu-item" type="button" id="againBtn">Climb again</button>
+      <button class="menu-item" type="button" id="menuBtn">Main menu</button>
+    </nav>
   </div>
 </section>
 
@@ -234,10 +408,12 @@ body.touch.playing #pauseBtn { display: grid; }
 <script src="js/core.js"></script>
 <script src="js/art.js"></script>
 <script src="js/draw.js"></script>
+<script src="js/fx.js"></script>
 <script src="js/tower.js"></script>
 <script src="js/guide.js"></script>
 <script src="js/game.js"></script>
 <script src="js/weapons.js"></script>
 <script src="js/buffs.js"></script>
 <script src="js/shop.js"></script>
+<script src="js/menu.js"></script>
 <script src="js/game-ui.js"></script>
