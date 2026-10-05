@@ -358,7 +358,7 @@
           const f = planets.length && V.art.frame(planets[i % planets.length], { t });
           if (!f) { ctx.drawImage(d.spr.canvas, ox, y - d.spr.ext, size, size); continue; }
           const cx = ox + d.spr.ext, h = d.R * 2.1 * V.art.opt(planets[i % planets.length], 'scale', 1), w = h * f.sw / f.sh;
-          V.drawGlow(ctx, cx, y, d.R * 1.55, '#c78bff', 0.28); // soft atmosphere
+          V.drawGlow(ctx, cx, y, d.R * 1.4, '#8a5ac8', 0.16); // faint atmosphere
           ctx.drawImage(f.img, f.sx, f.sy, f.sw, f.sh, cx - w / 2, y - h / 2, w, h);
         }
       });

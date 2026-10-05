@@ -1,111 +1,213 @@
 {
  "island_moss_a": {
-  "surface": 0.259
+  "surface": 0.257,
+  "span": [
+   0.017,
+   0.822
+  ]
  },
  "island_moss_b": {
-  "surface": 0.325
+  "surface": 0.345,
+  "span": [
+   0.03,
+   0.98
+  ]
  },
  "island_moss_c": {
-  "surface": 0.066
+  "surface": 0.047,
+  "span": [
+   0.142,
+   0.845
+  ]
  },
  "island_moss_d": {
-  "surface": 0.065
+  "surface": 0.056,
+  "span": [
+   0.017,
+   0.973
+  ]
  },
  "island_moss_e": {
-  "surface": 0.063
- },
- "island_moss_f": {
-  "surface": 0.203
+  "surface": 0.045,
+  "span": [
+   0.126,
+   0.778
+  ]
  },
  "island_ember_a": {
-  "surface": 0.259
+  "surface": 0.257,
+  "span": [
+   0.017,
+   0.822
+  ]
  },
  "island_ember_b": {
-  "surface": 0.325
+  "surface": 0.345,
+  "span": [
+   0.03,
+   0.98
+  ]
  },
  "island_ember_c": {
-  "surface": 0.066
+  "surface": 0.047,
+  "span": [
+   0.142,
+   0.845
+  ]
  },
  "island_ember_d": {
-  "surface": 0.065
+  "surface": 0.056,
+  "span": [
+   0.017,
+   0.973
+  ]
  },
  "island_ember_e": {
-  "surface": 0.063
- },
- "island_ember_f": {
-  "surface": 0.203
+  "surface": 0.045,
+  "span": [
+   0.126,
+   0.778
+  ]
  },
  "island_lavender_a": {
-  "surface": 0.259
+  "surface": 0.257,
+  "span": [
+   0.017,
+   0.822
+  ]
  },
  "island_lavender_b": {
-  "surface": 0.325
+  "surface": 0.345,
+  "span": [
+   0.03,
+   0.98
+  ]
  },
  "island_lavender_c": {
-  "surface": 0.066
+  "surface": 0.047,
+  "span": [
+   0.142,
+   0.845
+  ]
  },
  "island_lavender_d": {
-  "surface": 0.065
+  "surface": 0.056,
+  "span": [
+   0.017,
+   0.973
+  ]
  },
  "island_lavender_e": {
-  "surface": 0.063
- },
- "island_lavender_f": {
-  "surface": 0.203
+  "surface": 0.045,
+  "span": [
+   0.126,
+   0.778
+  ]
  },
  "island_frost_a": {
-  "surface": 0.259
+  "surface": 0.257,
+  "span": [
+   0.017,
+   0.822
+  ]
  },
  "island_frost_b": {
-  "surface": 0.325
+  "surface": 0.345,
+  "span": [
+   0.03,
+   0.98
+  ]
  },
  "island_frost_c": {
-  "surface": 0.066
+  "surface": 0.047,
+  "span": [
+   0.142,
+   0.845
+  ]
  },
  "island_frost_d": {
-  "surface": 0.065
+  "surface": 0.056,
+  "span": [
+   0.017,
+   0.973
+  ]
  },
  "island_frost_e": {
-  "surface": 0.063
- },
- "island_frost_f": {
-  "surface": 0.203
+  "surface": 0.045,
+  "span": [
+   0.126,
+   0.778
+  ]
  },
  "island_asteroid_a": {
-  "surface": 0.259
+  "surface": 0.257,
+  "span": [
+   0.017,
+   0.822
+  ]
  },
  "island_asteroid_b": {
-  "surface": 0.325
+  "surface": 0.345,
+  "span": [
+   0.03,
+   0.98
+  ]
  },
  "island_asteroid_c": {
-  "surface": 0.066
+  "surface": 0.047,
+  "span": [
+   0.142,
+   0.845
+  ]
  },
  "island_asteroid_d": {
-  "surface": 0.065
+  "surface": 0.056,
+  "span": [
+   0.017,
+   0.973
+  ]
  },
  "island_asteroid_e": {
-  "surface": 0.063
- },
- "island_asteroid_f": {
-  "surface": 0.203
+  "surface": 0.045,
+  "span": [
+   0.126,
+   0.778
+  ]
  },
  "island_storm_a": {
-  "surface": 0.259
+  "surface": 0.257,
+  "span": [
+   0.017,
+   0.822
+  ]
  },
  "island_storm_b": {
-  "surface": 0.325
+  "surface": 0.345,
+  "span": [
+   0.03,
+   0.98
+  ]
  },
  "island_storm_c": {
-  "surface": 0.066
+  "surface": 0.047,
+  "span": [
+   0.142,
+   0.845
+  ]
  },
  "island_storm_d": {
-  "surface": 0.065
+  "surface": 0.056,
+  "span": [
+   0.017,
+   0.973
+  ]
  },
  "island_storm_e": {
-  "surface": 0.063
- },
- "island_storm_f": {
-  "surface": 0.203
+  "surface": 0.045,
+  "span": [
+   0.126,
+   0.778
+  ]
  },
  "platform_zone1": {
   "variants": [
@@ -209,6 +311,6 @@
   "scale": 1.05
  },
  "planet": {
-  "scale": 1.0
+  "scale": 0.85
  }
 }

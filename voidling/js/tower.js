@@ -90,10 +90,18 @@
         const key = fam && fam.length ? fam[(islandSeed(p) + i * 7) % fam.length] : a.key;
         const f = V.art.frame(key, { t });
         if (!f) continue;
-        const over = V.art.opt(key, 'overhang', 0.04), k = V.art.opt(key, 'scale', 1), surf = V.art.opt(key, 'surface', 0.12);
-        const pw = seg * (n > 1 ? 1.32 : 1), W = pw * (1 + over * 2), H = W * f.sh / f.sw * k;
-        const cx = x0 + seg * (i + 0.5);
-        ctx.drawImage(f.img, f.sx, f.sy, f.sw, f.sh, cx - W / 2, y0 - H * surf, W, H);
+        const k = V.art.opt(key, 'scale', 1), surf = V.art.opt(key, 'surface', 0.12), span = V.art.opt(key, 'span', null);
+        const pw = seg * (n > 1 ? 1.32 : 1), cx = x0 + seg * (i + 0.5);
+        let W, left;
+        if (span) { // the art's flat walkable part [left, right] (0..1) fills the platform exactly
+          W = pw / Math.max(0.2, span[1] - span[0]);
+          left = cx - (span[0] + span[1]) / 2 * W;
+        } else {
+          W = pw * (1 + V.art.opt(key, 'overhang', 0.04) * 2);
+          left = cx - W / 2;
+        }
+        const H = W * f.sh / f.sw * k;
+        ctx.drawImage(f.img, f.sx, f.sy, f.sw, f.sh, left, y0 - H * surf, W, H);
       }
       return;
     }
@@ -528,6 +536,7 @@
           e.turnT -= dt;
           if (e.turnT <= 0) { e.turnT = V.rand(1.5, 4); if (V.chance(0.4)) e.dir *= -1; }
           e.x += e.dir * e.speed * dt;
+          e.walk = (e.walk || 0) + e.speed * dt; // distance walked: drives the leg animation
           if (e.x < pl.x + e.a) { e.x = pl.x + e.a; e.dir = 1; }
           else if (e.x > pl.x + pl.w - e.a) { e.x = pl.x + pl.w - e.a; e.dir = -1; }
           e.y = pl.y - e.a * 0.85;

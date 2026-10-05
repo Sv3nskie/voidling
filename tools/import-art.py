@@ -14,7 +14,7 @@ import json, sys
 from pathlib import Path
 import numpy as np
 import pymupdf
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 from scipy import ndimage
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -47,6 +47,11 @@ PALS = {
 }
 # Which palettes each zone's islands use (zone 1 = canyon ... zone 5 = starfield)
 ZONE_PALS = [['moss', 'ember'], ['lavender', 'moss'], ['asteroid', 'frost'], ['storm', 'asteroid'], ['lavender', 'frost', 'storm']]
+
+# Hand-checked walkable tops where the measurement needs help: (surface, left, right), or None
+# to leave an island out. b's grass dips a little on the left but is one surface; f has two
+# levels, so you would float over its lower ledge.
+FIT = {'b': (0.345, 0.03, 0.98), 'f': None}
 
 SIZES = {'island': 640, 'deco': 200, 'planet': 300, 'ufo': 280, 'gun': 300}  # output width in px
 
@@ -96,13 +101,37 @@ def recolor(img, pal, keep=0.18):
     return Image.fromarray((np.dstack([out, alpha]) * 255).round().astype(np.uint8), 'RGBA')
 
 
-def surface_line(img):
-    """Where the walkable top of an island is: the first row that is solid across most of it."""
-    al = np.asarray(img)[..., 3] > 40
-    w = al.shape[1]
-    for y in range(al.shape[0]):
-        if al[y].sum() > w * 0.55: return y / al.shape[0]
-    return 0.12
+def walkable(img):
+    """Where an island can be walked on: the top of its grass cap, measured per column. Returns
+    (surface, left, right): the cap's typical height (0..1 down the image) and the widest run of
+    columns where the cap top is at that height (0..1 across). The game fits that flat run onto
+    the platform, so the rounded rims hang over the edges and spikes sit on real grass."""
+    a = np.asarray(img, float) / 255
+    h_, s_ = rgb_to_hs(a[..., :3])
+    cap = (a[..., 3] > 0.3) & (h_ > 0.11) & (h_ < 0.47) & (s_ > 0.28)
+    H, W = cap.shape
+    cap = ndimage.binary_opening(cap, structure=np.ones((1, max(3, W // 30))))  # ignore thin grass blades
+    has = cap.any(0)
+    top = np.where(has, cap.argmax(0), H) / H
+    surface = float(np.median(top[has]))
+    flat = has & (np.abs(top - surface) < 0.08)
+    flat = ndimage.binary_closing(flat, iterations=max(1, W // 60))  # bridge small gaps (a grass tuft)
+    runs, n = ndimage.label(flat)
+    if not n: return surface, 0.0, 1.0
+    best = max(range(1, n + 1), key=lambda k: (runs == k).sum())
+    cols = np.where(runs == best)[0]
+    return surface, cols[0] / W, (cols[-1] + 1) / W
+
+
+def background(img):
+    """Push a planet into the distance: muted, darker, hazy violet, a little soft."""
+    a = np.asarray(img, float) / 255
+    rgb, al = a[..., :3], a[..., 3]
+    lum = (rgb @ np.array([0.299, 0.587, 0.114]))[..., None]
+    rgb = rgb * 0.5 + lum * 0.5                      # less saturated
+    rgb = rgb * 0.62 * 0.62 + hex_rgb('#4a2a7a') * 0.38  # darker, sunk into the violet haze
+    out = Image.fromarray((np.dstack([rgb, al * 0.92]) * 255).round().astype(np.uint8), 'RGBA')
+    return out.filter(ImageFilter.GaussianBlur(1.4))
 
 
 def main():
@@ -157,13 +186,23 @@ def main():
         elif role.startswith('deco:'): decos[role[5:]] = img
         elif role.startswith('gun:'):
             save(img.transpose(Image.FLIP_LEFT_RIGHT), 'gun_' + role[4:])  # drawn facing left; the game wants right
+        elif role.startswith('planet'): save(background(img), role)  # scenery, not something to grab
         else: save(img, role)
 
+    # Islands need a flat walkable top across at least half their width; others (a two-level
+    # island) would leave you floating over a lower ledge, so they're left out
+    fits = {}
+    for key, img in islands.items():
+        surf, left, right = walkable(img)
+        if key in FIT: surf, left, right = FIT[key] or (surf, 0, 0)
+        print(f'island {key}: walkable top at {surf:.2f}, flat from {left:.2f} to {right:.2f}')
+        if right - left >= 0.5: fits[key] = [round(surf, 3), round(left, 3), round(right, 3)]
+        else: print(f'  island {key} left out: its top is not flat enough to stand on')
     for pname, pal in PALS.items():
-        for key, img in islands.items():
+        for key in fits:
             name = f'island_{pname}_{key}'
-            save(recolor(img, pal), name)
-            settings[name] = {'surface': round(surface_line(img), 3)}
+            save(recolor(islands[key], pal), name)
+            settings[name] = {'surface': fits[key][0], 'span': fits[key][1:]}
         for key, img in decos.items():
             save(recolor(img, pal, keep=0.25), f'deco_{key}_{pname}')
     for z, pals in enumerate(ZONE_PALS):
@@ -173,7 +212,7 @@ def main():
     # Decoration sizes relative to the default 15 units tall
     settings.update({'deco_cactus': {'scale': 1.75}, 'deco_bush': {'scale': 1.05}, 'deco_grass': {'scale': 1.0}, 'deco_rock': {'scale': 0.75}})
     settings['ufo'] = {'scale': 1.05}
-    settings['planet'] = {'scale': 1.0}
+    settings['planet'] = {'scale': 0.85}
     (OUT / 'settings.json').write_text(json.dumps(settings, indent=1) + '\n')
     print(f'{len(objs)} objects -> {len(list(OUT.glob("*.webp")))} images in {OUT}')
 

@@ -72,65 +72,184 @@
 
   // Bounce light under each alien: a contrasting tint makes the gloss read on any color
   const rimFor = color => (color === '#ff8ad8' ? '#8ff0ff' : color === '#6bf0ff' ? '#ff9ad5' : '#ffd0f0');
+  // ---------- Aliens: four species with legs and arms ----------
+  // Each alien is always the same species (from its seed). Legs step with the distance it has
+  // walked, arms swing against the legs and go up when you come close. Spiky ones carry red
+  // crystal spikes on their back (those can't be stomped).
+  const SPECIES = ['blob', 'bean', 'crab', 'squid'];
+  const hexMix = (a, b, k) => '#' + [1, 3, 5].map(i => Math.round(parseInt(a.substr(i, 2), 16) * (1 - k) + parseInt(b.substr(i, 2), 16) * k).toString(16).padStart(2, '0')).join('');
+  const limb = (ctx, x0, y0, cx, cy, x1, y1, w, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(cx, cy, x1, y1); ctx.stroke();
+  };
+  const blob = (ctx, color, x, y, rx, ry) => ctx.drawImage(V.gloss.dot(color), x - rx, y - ry, rx * 2, ry * 2);
+  const bodyAt = (ctx, color, cx, cy, rx, ry) => {
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(rx / ry, 1);
+    V.gloss.draw(ctx, V.gloss.body(color, rimFor(color)), 0, 0, ry, 60);
+    ctx.restore();
+  };
+  const crystalSpikes = (ctx, cx, cy, rx, ry, a) => {
+    for (let i = 0; i < 5; i++) {
+      const ang = -Math.PI * (0.85 - i * 0.175), cs = Math.cos(ang), sn = Math.sin(ang);
+      const bx = cx + cs * rx * 0.9, by = cy + sn * ry * 0.9, nx = -sn * a * 0.17, ny = cs * a * 0.17;
+      const tipX = bx + cs * a * 0.6, tipY = by + sn * a * 0.6;
+      ctx.fillStyle = '#c4123f';
+      ctx.beginPath(); ctx.moveTo(bx + nx, by + ny); ctx.lineTo(tipX, tipY); ctx.lineTo(bx - nx, by - ny); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ff8aa8';
+      ctx.beginPath(); ctx.moveTo(bx + nx * 0.2, by + ny * 0.2); ctx.lineTo(tipX, tipY); ctx.lineTo(bx - nx, by - ny); ctx.closePath(); ctx.fill();
+    }
+  };
+  const faceAt = (ctx, e, cx, cy, er, gap, look, danger, t, mouthY) => {
+    const n = e.eyes, blink = Math.sin(t * 1.1 + e.phase * 3) > 0.97 ? 0.15 : 1;
+    for (let i = 0; i < n; i++) {
+      const ex = cx + (i - (n - 1) / 2) * gap;
+      if (e.xeyes) { // knocked out
+        ctx.strokeStyle = '#1a0b33'; ctx.lineWidth = er * 0.45; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(ex - er * 0.6, cy - er * 0.6); ctx.lineTo(ex + er * 0.6, cy + er * 0.6);
+        ctx.moveTo(ex + er * 0.6, cy - er * 0.6); ctx.lineTo(ex - er * 0.6, cy + er * 0.6); ctx.stroke();
+      } else eye(ctx, ex, cy, er, er * blink, look[0], look[1], danger ? '#c4002f' : '#3a1a7a');
+    }
+    if (mouthY === undefined) return;
+    ctx.fillStyle = '#2a0b2a';
+    ctx.beginPath(); ctx.ellipse(cx + er * 0.3, mouthY, er * 1.0, danger || look[2] ? er * 0.6 : er * 0.3, 0, 0, TAU); ctx.fill();
+    if (look[2]) { // close to you: a mouthful of little teeth
+      ctx.fillStyle = '#fff4e8';
+      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(cx + er * (0.3 + k * 0.45) - er * 0.15, mouthY - er * 0.45); ctx.lineTo(cx + er * (0.3 + k * 0.45) + er * 0.15, mouthY - er * 0.45); ctx.lineTo(cx + er * (0.3 + k * 0.45), mouthY - er * 0.1); ctx.closePath(); ctx.fill(); }
+    }
+  };
+  const SPECIES_DRAW = {
+    // Round body on stubby legs with big feet, swinging arms with round hands, antennae
+    blob(ctx, e, a, c, look, t, dk, ft) {
+      const rb = a * 0.8, leg = a * 0.42, bob = Math.abs(Math.sin(c)) * a * 0.06, cy = -leg - rb * 0.9 - bob;
+      for (const s of [-1, 1]) {
+        const sw = Math.sin(c + (s > 0 ? 0 : Math.PI)), hx = s * a * 0.3, fx = hx + sw * a * 0.24, fy = -Math.max(0, Math.cos(c + (s > 0 ? 0 : Math.PI))) * a * 0.14;
+        limb(ctx, hx, cy + rb * 0.6, hx + a * 0.12, (cy + fy) / 2 + a * 0.15, fx, fy - a * 0.06, a * 0.17, s < 0 ? hexMix(dk, '#000000', 0.25) : dk);
+        blob(ctx, s < 0 ? hexMix(ft, '#000000', 0.25) : ft, fx + a * 0.07, fy - a * 0.05, a * 0.2, a * 0.12);
+      }
+      const arm = s => {
+        const ang = look[2] ? -Math.PI / 2 - s * 0.55 + Math.sin(t * 12 + s) * 0.25 : Math.PI / 2 - s * 0.55 + Math.sin(c + (s > 0 ? Math.PI : 0)) * 0.45;
+        const sx = s * rb * 0.82, sy = cy + rb * 0.05, hx = sx + Math.cos(ang) * a * 0.5, hy = sy + Math.sin(ang) * a * 0.5;
+        limb(ctx, sx, sy, sx + Math.cos(ang - s * 0.6) * a * 0.3, sy + Math.sin(ang - s * 0.6) * a * 0.3, hx, hy, a * 0.13, s < 0 ? hexMix(dk, '#000000', 0.25) : dk);
+        blob(ctx, s < 0 ? hexMix(ft, '#000000', 0.25) : ft, hx, hy, a * 0.15, a * 0.15);
+      };
+      arm(-1);
+      ctx.strokeStyle = dk; ctx.lineWidth = a * 0.11; ctx.lineCap = 'round';
+      const sway = Math.sin(t * 6 + e.phase) * a * 0.08;
+      for (const s of [-1, 1]) { // antennae with shiny bulbs
+        const tx = s * a * 0.25 + sway, ty = cy - rb - a * 0.55;
+        ctx.beginPath(); ctx.moveTo(s * a * 0.28, cy - rb * 0.7); ctx.quadraticCurveTo(s * a * 0.48, cy - rb - a * 0.2, tx, ty); ctx.stroke();
+        V.drawGlow(ctx, tx, ty, a * 0.5, '#fff3b8', 0.7);
+        blob(ctx, '#fff3b8', tx, ty, a * 0.16, a * 0.16);
+      }
+      bodyAt(ctx, e.color, 0, cy, rb, rb * 0.92);
+      return { cx: 0, cy, rx: rb, ry: rb * 0.92, eye: [a * 0.12, cy - rb * 0.15, a * (e.eyes === 1 ? 0.3 : 0.2), a * 0.38], mouth: cy + rb * 0.42, front: () => arm(1) };
+    },
+    // Tall bean on long thin legs, long arms, a sprout on top
+    bean(ctx, e, a, c, look, t, dk, ft) {
+      const rx = a * 0.56, ry = a * 0.88, leg = a * 0.5, bob = Math.abs(Math.sin(c)) * a * 0.05, cy = -leg - ry * 0.92 - bob;
+      for (const s of [-1, 1]) {
+        const sw = Math.sin(c + (s > 0 ? 0 : Math.PI)), hx = s * a * 0.2, fx = hx + sw * a * 0.3, fy = -Math.max(0, Math.cos(c + (s > 0 ? 0 : Math.PI))) * a * 0.16;
+        limb(ctx, hx, cy + ry * 0.7, hx + a * 0.2, (cy + fy) / 2 + a * 0.2, fx, fy - a * 0.04, a * 0.11, s < 0 ? hexMix(dk, '#000000', 0.25) : dk);
+        blob(ctx, s < 0 ? hexMix(ft, '#000000', 0.25) : ft, fx + a * 0.08, fy - a * 0.04, a * 0.17, a * 0.09);
+      }
+      const arm = s => {
+        const ang = look[2] ? -Math.PI / 2 - s * 0.35 + Math.sin(t * 10 + s * 2) * 0.3 : Math.PI / 2 - s * 0.3 + Math.sin(c + (s > 0 ? Math.PI : 0)) * 0.5;
+        const sx = s * rx * 0.85, sy = cy - ry * 0.05, hx = sx + Math.cos(ang) * a * 0.7, hy = sy + Math.sin(ang) * a * 0.7;
+        limb(ctx, sx, sy, sx + Math.cos(ang - s * 0.5) * a * 0.42, sy + Math.sin(ang - s * 0.5) * a * 0.42, hx, hy, a * 0.1, s < 0 ? hexMix(dk, '#000000', 0.25) : dk);
+        blob(ctx, s < 0 ? hexMix(ft, '#000000', 0.25) : ft, hx, hy, a * 0.13, a * 0.13);
+      };
+      arm(-1);
+      // sprout: two leaves on a stalk, swaying
+      const sw = Math.sin(t * 4 + e.phase) * 0.25, tx = Math.sin(sw) * a * 0.35, ty = cy - ry - a * 0.32;
+      limb(ctx, 0, cy - ry * 0.85, tx * 0.3, cy - ry - a * 0.1, tx, ty, a * 0.08, dk);
+      for (const s of [-1, 1]) {
+        ctx.save(); ctx.translate(tx, ty); ctx.rotate(s * 0.9 + sw);
+        ctx.fillStyle = s < 0 ? '#5fd37a' : '#9dff6b';
+        ctx.beginPath(); ctx.ellipse(s * a * 0.16, 0, a * 0.18, a * 0.08, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+      bodyAt(ctx, e.color, 0, cy, rx, ry);
+      return { cx: 0, cy, rx, ry, eye: [a * 0.1, cy - ry * 0.32, a * (e.eyes === 1 ? 0.28 : 0.18), a * 0.32], mouth: cy + ry * 0.15, front: () => arm(1) };
+    },
+    // Wide low shell on four scuttling legs, two snapping claws, eyes on stalks
+    crab(ctx, e, a, c, look, t, dk, ft) {
+      const rx = a * 1.0, ry = a * 0.55, cy = -a * 0.36 - ry * 0.85 - Math.abs(Math.sin(c * 2)) * a * 0.04;
+      for (const [i, hx] of [-0.75, -0.35, 0.35, 0.75].entries()) {
+        const s = Math.sign(hx), ph = c * 1.6 + i * Math.PI / 2, lift = Math.max(0, Math.sin(ph)) * a * 0.12;
+        const bx = hx * rx, kx = bx + s * a * 0.3, fx = bx + s * a * 0.45 + Math.cos(ph) * a * 0.12;
+        ctx.strokeStyle = i % 2 ? dk : hexMix(dk, '#000000', 0.25); ctx.lineWidth = a * 0.1; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(bx, cy + ry * 0.4); ctx.lineTo(kx, cy - a * 0.02 - lift); ctx.lineTo(fx, -lift * 0.3); ctx.stroke();
+      }
+      const open = 0.25 + 0.25 * (0.5 + 0.5 * Math.sin(t * (look[2] ? 14 : 5) + e.phase));
+      const claw = s => {
+        const sx = s * rx * 0.55 + a * 0.25, sy = cy - ry * 0.2, hx = sx + a * 0.45 + (s < 0 ? -a * 0.1 : 0), hy = sy - a * (look[2] ? 0.75 : 0.45);
+        limb(ctx, sx, sy, sx + a * 0.4, sy + a * 0.1, hx, hy, a * 0.12, s < 0 ? hexMix(dk, '#000000', 0.25) : dk);
+        const cc = s < 0 ? hexMix(e.color, '#000000', 0.2) : e.color;
+        ctx.save(); ctx.translate(hx, hy);
+        for (const j of [-1, 1]) { // two pincers opening and closing
+          ctx.save(); ctx.rotate(-0.4 + j * open);
+          bodyAt(ctx, cc, a * 0.2, 0, a * 0.24, a * 0.1);
+          ctx.restore();
+        }
+        ctx.restore();
+      };
+      claw(-1);
+      for (const s of [-1, 1]) { // eye stalks
+        const ex = s * a * 0.28 + a * 0.15, ey = cy - ry - a * 0.42 + Math.sin(t * 5 + s) * a * 0.04;
+        limb(ctx, s * a * 0.22 + a * 0.1, cy - ry * 0.6, ex - s * a * 0.05, cy - ry - a * 0.15, ex, ey, a * 0.09, dk);
+      }
+      bodyAt(ctx, e.color, 0, cy, rx, ry);
+      return { cx: 0, cy, rx, ry, eye: null, stalks: [cy - ry - a * 0.42, a * 0.2], mouth: cy + ry * 0.3, front: () => claw(1) };
+    },
+    // A dome on wiggling tentacles; the two front tentacles reach out like arms
+    squid(ctx, e, a, c, look, t, dk, ft) {
+      const rh = a * 0.78, cy = -a * 0.55 - rh * 0.6 - Math.abs(Math.sin(c)) * a * 0.05;
+      const tent = (i, n, reach) => {
+        const u = (i / (n - 1)) * 2 - 1, bx = u * rh * 0.7, w = Math.sin(t * 7 + i * 1.3 + e.phase);
+        const fx = bx + u * a * 0.25 + w * a * 0.12 + reach * a * 0.5, fy = reach ? cy - a * 0.1 : -a * 0.02;
+        ctx.strokeStyle = i % 2 ? dk : hexMix(dk, '#000000', 0.2); ctx.lineWidth = a * 0.16; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(bx, cy + rh * 0.35);
+        ctx.bezierCurveTo(bx + w * a * 0.2, cy + rh * 0.8, fx - w * a * 0.25, fy - a * 0.2, fx, fy); ctx.stroke();
+        blob(ctx, ft, fx, fy, a * 0.08, a * 0.08);
+      };
+      for (let i = 0; i < 4; i++) tent(i, 4, 0);
+      bodyAt(ctx, e.color, 0, cy, rh, rh * 0.85);
+      return { cx: 0, cy, rx: rh, ry: rh * 0.85, eye: [a * 0.12, cy - rh * 0.05, a * (e.eyes === 1 ? 0.32 : 0.21), a * 0.4], mouth: cy + rh * 0.45,
+        front: () => { if (look[2]) for (const s of [0.2, 0.75]) tent(s * 3, 4, 1); } };
+    },
+  };
+
   V.drawWalker = (ctx, e, t, danger, P) => {
     const { x, y, a } = e;
     if (danger) dangerAura(ctx, x, y, a, t);
-    // Jelly hop: squashed on each touchdown, stretched at the top of the hop
-    const hop = Math.abs(Math.sin(t * 9 + e.phase)), sq = (1 - hop) * 0.13 - hop * 0.06;
     ctx.save();
-    ctx.translate(x, y + a * 0.85 - hop * a * 0.14);
+    ctx.translate(x, y + a * 0.85); // feet on the ground
     ctx.scale(e.dir, 1);
-    ctx.scale((1 + sq) * (e.sx || 1), (1 - sq) * (e.sy || 1));
+    ctx.scale(e.sx || 1, e.sy || 1);
     const art = e.spikes ? V.art.pick('spiky_walk', 'spiky', 'alien_walk', 'alien') : V.art.pick('alien_walk', 'alien');
     if (art) {
       V.art.draw(ctx, art, 0, 0, { h: a * 2.4, anchor: 'bottom', t: t + e.phase });
       ctx.restore();
       return;
     }
-    ctx.translate(0, -a * 0.85);
-    ctx.strokeStyle = V.mixHex(e.color, '#1a0830', 0.25); ctx.lineWidth = a * 0.12; ctx.lineCap = 'round';
-    const sway = Math.sin(t * 6 + e.phase) * a * 0.08;
-    for (const s of [-1, 1]) { // antennae with shiny bulbs
-      const tx = s * a * 0.25 + sway, ty = -a * 1.35;
-      ctx.beginPath(); ctx.moveTo(s * a * 0.3, -a * 0.6); ctx.quadraticCurveTo(s * a * 0.5, -a * 1.2, tx, ty); ctx.stroke();
-      V.drawGlow(ctx, tx, ty, a * 0.55, '#fff3b8', 0.7);
-      ctx.drawImage(V.gloss.dot('#fff3b8'), tx - a * 0.17, ty - a * 0.17, a * 0.34, a * 0.34);
-    }
-    if (e.spikes) { // spiky back: can't be stomped. Glossy red crystal spikes.
-      for (let i = 0; i < 5; i++) {
-        const ang = -Math.PI * (0.85 - i * 0.175);
-        const bx = Math.cos(ang) * a * 0.8, by = Math.sin(ang) * a * 0.7;
-        const nx = -Math.sin(ang) * a * 0.18, ny = Math.cos(ang) * a * 0.18;
-        const tipX = bx + Math.cos(ang) * a * 0.6, tipY = by + Math.sin(ang) * a * 0.6;
-        ctx.fillStyle = '#c4123f';
-        ctx.beginPath(); ctx.moveTo(bx + nx, by + ny); ctx.lineTo(tipX, tipY); ctx.lineTo(bx - nx, by - ny); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#ff8aa8';
-        ctx.beginPath(); ctx.moveTo(bx + nx * 0.2, by + ny * 0.2); ctx.lineTo(tipX, tipY); ctx.lineTo(bx - nx, by - ny); ctx.closePath(); ctx.fill();
-      }
-    }
-    ctx.save();
-    ctx.scale(1, 0.85);
-    V.gloss.draw(ctx, V.gloss.body(e.color, rimFor(e.color)), 0, 0, a, 60);
-    ctx.restore();
-    // Eyes follow the Voidling
-    let lx = 0.6, ly = 0;
+    // Eyes follow the Voidling; arms go up when it's close
+    let lx = 0.6, ly = 0, near = false;
     if (P) {
       const dx = (P.x - x) * e.dir, dy = P.y - y, d = Math.hypot(dx, dy) || 1;
-      lx = dx / d; ly = dy / d;
+      lx = dx / d; ly = dy / d; near = d < 130;
     }
-    const eyes = e.eyes, blink = Math.sin(t * 1.1 + e.phase * 3) > 0.97 ? 0.15 : 1;
-    for (let i = 0; i < eyes; i++) {
-      const ex = (i - (eyes - 1) / 2) * a * 0.42 + a * 0.15, er = a * (eyes === 1 ? 0.34 : 0.22);
-      if (e.xeyes) { // knocked out
-        ctx.strokeStyle = '#1a0b33'; ctx.lineWidth = er * 0.45; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(ex - er * 0.6, -a * 0.15 - er * 0.6); ctx.lineTo(ex + er * 0.6, -a * 0.15 + er * 0.6);
-        ctx.moveTo(ex + er * 0.6, -a * 0.15 - er * 0.6); ctx.lineTo(ex - er * 0.6, -a * 0.15 + er * 0.6); ctx.stroke();
-      } else eye(ctx, ex, -a * 0.15, er, er * blink, lx, ly, danger ? '#c4002f' : '#3a1a7a');
+    const look = [lx, ly, near];
+    const sp = e.species || (e.species = SPECIES[Math.floor(e.phase * 977) % SPECIES.length]);
+    const c = (e.walk !== undefined ? e.walk : t * 40) / (a * 0.55) + e.phase; // step cycle
+    const dk = hexMix(e.color, '#1a0830', 0.42), ft = hexMix(e.color, '#1a0830', 0.25);
+    const g = SPECIES_DRAW[sp](ctx, e, a, c, look, t, dk, ft);
+    if (e.spikes) crystalSpikes(ctx, g.cx, g.cy, g.rx, g.ry, a);
+    if (g.eye) faceAt(ctx, e, g.eye[0], g.eye[1], g.eye[2], g.eye[3], look, danger, t, g.mouth);
+    else { // crab: eyes on the stalks, mouth on the shell
+      for (const s of [-1, 1]) faceAt(ctx, { eyes: 1, phase: e.phase + s, xeyes: e.xeyes }, s * a * 0.28 + a * 0.15, g.stalks[0], g.stalks[1], 0, look, danger, t);
+      faceAt(ctx, { eyes: 0, phase: e.phase }, a * 0.1, g.cy, a * 0.25, 0, look, danger, t, g.mouth);
     }
-    ctx.fillStyle = '#2a0b2a';
-    ctx.beginPath(); ctx.ellipse(a * 0.2, a * 0.36, a * 0.25, danger ? a * 0.16 : a * 0.08, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.beginPath(); ctx.ellipse(a * 0.12, a * 0.33, a * 0.07, a * 0.025, 0, 0, TAU); ctx.fill();
+    g.front();
     ctx.restore();
   };
 
