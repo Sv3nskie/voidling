@@ -215,6 +215,18 @@
       ctx.fillText(w.phase === 'gust' ? 'WIND' : 'WIND INCOMING', x, y + 44);
     }
 
+    // Right after a respawn the world waits for you
+    if (G.hold && G.state === 'play') {
+      ctx.globalAlpha = 0.7 + 0.3 * Math.sin(t * 5);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#5fe3ff'; ctx.shadowBlur = 16;
+      ctx.fillStyle = '#e0fdff'; ctx.font = `${Math.min(34, W / 16)}px ${FONT_D}`;
+      ctx.fillText('MOVE TO START', W / 2, H * 0.36);
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#b9a6d9'; ctx.font = `500 16px ${FONT_B}`;
+      ctx.fillText('Nothing attacks and the Void waits until you move', W / 2, H * 0.36 + 34);
+    }
     // A saucer still above the screen: red "UFO" marker at the top edge so it never surprises you
     for (const e of G.tower.enemies) {
       if (e.type !== 'saucer' || e.dead || e.leaving) continue;
@@ -352,6 +364,11 @@
     if (G.state === 'shop') return; // the world waits while you shop
     if (G.state === 'play') {
       if (G.freeze > 0) { G.freeze -= dt; return; } // hit-stop
+      if (G.hold) { // after a respawn: wait for the first control press
+        const I = V.input;
+        if (['left', 'right', 'down'].some(a => I.down(a)) || ['jump', 'chomp', 'shoot', 'click', 'hook', 'rclick', 'tshoot', 'thook'].some(a => I.hit(a))) G.hold = false;
+        else G.P.inv = Math.max(G.P.inv, 0.2);
+      }
       G.updatePlayer(dt);
       if (G.state === 'play') G.interact(); // nothing else happens on the frame you die
       if (G.state === 'play') G.updateWeapons(dt);
@@ -363,7 +380,7 @@
       G.tower.cull(G.voidY);
     }
     if (G.state === 'reviving' && (G.revive.t += dt) > 2.4) cont(); // diamond revive: back to the checkpoint
-    G.tower.update(dt, G.t, G.P);
+    G.tower.update(dt, G.t, G.P, G.hold);
     updateCamera(dt);
     G.shake = Math.max(0, G.shake - dt * 30);
     G.flash = Math.max(0, G.flash - dt);

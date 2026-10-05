@@ -371,7 +371,8 @@
     }
 
     // ---------- Simulation ----------
-    update(dt, t, P) {
+    // frozen: right after a respawn nothing moves or attacks until you do
+    update(dt, t, P, frozen = false) {
       for (const p of this.plats) {
         if (p.type === 'moving') {
           const nx = p.baseX + Math.sin(t * p.speed + p.phase) * p.amp;
@@ -394,7 +395,7 @@
           }
         }
       }
-      for (const e of this.enemies) {
+      for (const e of frozen ? [] : this.enemies) {
         if (e.dead) continue;
         e.hurtT -= dt;
         if (e.type === 'walker' || e.type === 'spiky') {

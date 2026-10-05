@@ -71,7 +71,7 @@
     G.P = freshPlayer(0, -R);
     G.P.diamonds = 1; // every run starts with one revive
     Object.assign(G, { voidY: 320, voidDelay: 4, saucerT: 12, thunderT: 4, checkpoint: null, banner: null, shake: 0, freeze: 0, flash: 0 });
-    Object.assign(G, { surge: { phase: 'calm', t: 30, k: 0 }, lastBest: 0, stallT: 0, stallMul: 1, chain: 0, chainT: -9 });
+    Object.assign(G, { surge: { phase: 'calm', t: 30, k: 0 }, lastBest: 0, stallT: 0, stallMul: 1, chain: 0, chainT: -9, hold: false });
     Object.assign(G.wind, { phase: 'calm', t: 3, power: 0, streaks: [] });
     G.flags = {};
     G.shots = []; G.blasts = [];
@@ -89,9 +89,11 @@
     else { G.tower.reset(); G.tower.init(G.ppu()); }
     G.P = Object.assign(freshPlayer(x, y), {
       best: old.best, peak: G.meters(y), diamonds: old.diamonds, coins: old.coins, kills: old.kills, time: old.time,
+      held: old.held, hooks: old.hooks, // you keep your gun (or whatever you held) and your hooks
       zone: cp ? cp.zone : 0, inv: 2, maxHearts: old.maxHearts, hearts: 3,
     });
     Object.assign(G, { voidY: y + 500, voidDelay: 3, banner: null, shake: 0, freeze: 0, shots: [], blasts: [] });
+    G.hold = true; // nothing attacks and the Void waits until you move
     Object.assign(G, { surge: { phase: 'calm', t: 18, k: 0 }, lastBest: G.P.peak, stallT: 0, stallMul: 1 });
     Object.assign(G.cam, { y: y - 100, vy: 0, focus: y });
     G.tower.generate(G.cam.y - 1400);
@@ -316,6 +318,7 @@
 
   // ---------- The rising Void, beacons, zones, wind ----------
   G.updateVoid = dt => {
+    if (G.hold) return; // waiting for you to move after a respawn
     const P = G.P, zi = V.zoneAt(P.peak), z = V.ZONES[zi], s = G.surge;
     const frozen = P.buffs.freeze > 0;
     // Stalling makes it hungrier: no new height for ~5 s speeds it up, up to 2x
@@ -428,14 +431,14 @@
       V.sfx.tier();
       if (STORY[zi]) G.say(...STORY[zi]);
     }
-    if (z.saucer > 0) {
+    if (z.saucer > 0 && !G.hold) {
       G.saucerT -= dt;
       if (G.saucerT <= 0 && !G.tower.enemies.some(e => e.type === 'saucer' && !e.dead)) { // one at a time
         G.saucerT = z.saucer * V.rand(0.8, 1.3);
         G.tower.addEnemy('saucer', V.clamp(P.x + (V.chance(0.5) ? 1 : -1) * 250, -HALF, HALF), G.cam.y - G.view().h * 0.6);
       }
     }
-    if (z.wind > 0) {
+    if (z.wind > 0 && !G.hold) {
       w.t -= dt;
       if (w.t <= 0) {
         if (w.phase === 'calm') { w.phase = 'warn'; w.t = 1.0; w.dir = V.chance(0.5) ? 1 : -1; }
