@@ -13,3 +13,6 @@ key.properties
 Thumbs.db
 .vscode/
 .idea/
+
+# Download QR for the Android app (regenerate any time)
+voidling-android-qr.png

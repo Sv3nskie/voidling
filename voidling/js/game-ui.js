@@ -133,6 +133,78 @@
     for (const x of [-HALF, HALF]) { ctx.beginPath(); ctx.moveTo(x, box.y0); ctx.lineTo(x, box.y1); ctx.stroke(); }
     ctx.setLineDash([]);
   }
+  // Falling guide: predicts your fall from your current speed and the keys you hold, as a
+  // dotted path ending in a cyan ring on the island you'll land on, or a red X if you'd miss
+  G.fallGuide = null;
+  function drawFallGuide() {
+    const P = G.P, I = V.input, PH = G.PH, R = G.R;
+    G.fallGuide = null;
+    if (P.onGround || P.vy < 120 || P.rescue || P.hook || G.hold) return;
+    const dir = (I.down('right') ? 1 : 0) - (I.down('left') ? 1 : 0);
+    let x = P.x, y = P.y, vx = P.vx, vy = P.vy, land = null;
+    const path = [];
+    for (let i = 0; i < 150 && !land; i++) {
+      const dt = 1 / 60, oy = y;
+      vx = V.approach(vx, dir * PH.RUN, PH.ACC_A * dt);
+      vy = Math.min(vy + PH.G * dt, P.gliding ? PH.GLIDE : PH.MAXFALL);
+      x = V.clamp(x + vx * dt, -HALF + R, HALF - R); y += vy * dt;
+      for (const p of G.tower.plats) {
+        if (!p.fallen && x + R * 0.7 >= p.x && x - R * 0.7 <= p.x + p.w && oy + R <= p.y + 2 && y + R >= p.y) { land = { x, y: p.y }; break; }
+      }
+      if (i % 5 === 0) path.push([x, y]);
+      if (y > G.voidY) break;
+    }
+    ctx.fillStyle = land ? '#9ff3ff' : '#ff6f8f';
+    path.forEach(([px, py], i) => {
+      ctx.globalAlpha = 0.65 * (1 - i / (path.length + 4));
+      ctx.beginPath(); ctx.arc(px, py, 2.4, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    const t = G.t;
+    if (land) {
+      ctx.strokeStyle = '#5fe3ff'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.ellipse(land.x, land.y, 16 + Math.sin(t * 8) * 2, 5, 0, 0, Math.PI * 2); ctx.stroke();
+    } else if (path.length) {
+      const [ex, ey] = path[path.length - 1];
+      ctx.strokeStyle = '#ff4f7a'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ex - 8, ey - 8); ctx.lineTo(ex + 8, ey + 8); ctx.moveTo(ex + 8, ey - 8); ctx.lineTo(ex - 8, ey + 8); ctx.stroke();
+    }
+    G.fallGuide = { land };
+  }
+  // While falling: arrows along the bottom of the screen for islands below it, with distance
+  function drawBelowMarkers(W, H) {
+    const P = G.P, cam = G.cam, z = cam.zoom, ui = G.ui;
+    if (!G.fallGuide || G.state !== 'play') return;
+    const bottomY = cam.y + G.H / z / 2; // world y of the screen bottom
+    const land = G.fallGuide.land;
+    if (land && land.y <= bottomY) return; // you can already see where you'll land
+    const screenX = p => V.clamp(((p.x + p.w / 2 - cam.x) * z + G.W / 2) / ui, 30, W - 30);
+    const below = [];
+    G.tower.plats
+      .filter(p => !p.fallen && p.y > bottomY && p.y - P.y < 1000)
+      .map(p => ({ p, d: p.y - P.y + Math.abs(p.x + p.w / 2 - P.x) * 0.5 }))
+      .sort((a, b) => a.d - b.d)
+      .forEach(c => { if (below.length < 4 && below.every(b => Math.abs(screenX(b.p) - screenX(c.p)) > 56)) below.push(c); });
+    const y = H - (W < 760 ? 178 : 128) - G.reserve; // just above the tip line
+    below.forEach(({ p }, i) => {
+      const sx = screenX(p);
+      ctx.globalAlpha = i === 0 ? 0.95 : 0.55;
+      ctx.fillStyle = p.type === 'solid' ? '#5fe3ff' : '#ffb066'; // orange: crumbling or moving
+      ctx.beginPath(); ctx.moveTo(sx - 10, y); ctx.lineTo(sx + 10, y); ctx.lineTo(sx, y + 12); ctx.closePath(); ctx.fill();
+      ctx.font = `11px ${FONT_D}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(`${Math.round((p.y - P.y) / M)} m`, sx, y - 3);
+    });
+    ctx.globalAlpha = 1;
+    if (!G.fallGuide.land && !below.length) {
+      ctx.fillStyle = `rgba(255,79,122,${0.7 + 0.3 * Math.sin(G.t * 10)})`;
+      ctx.font = `16px ${FONT_D}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('NO PLATFORM BELOW: STEER!', W / 2, y);
+    } else if (!land) {
+      ctx.fillStyle = `rgba(255,79,122,${0.7 + 0.3 * Math.sin(G.t * 10)})`;
+      ctx.font = `14px ${FONT_D}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('YOU WILL MISS: STEER TOWARD AN ARROW', W / 2, y - 34);
+    }
+  }
   // Shadow + dotted drop line on the platform below you
   function drawLandingShadow() {
     const P = G.P, r = G.R;
@@ -170,6 +242,7 @@
     for (let i = 0; i < 3; i++) V.drawDiamond(ctx, pad + 11 + i * 26, pad + 95, 9, t, i >= P.diamonds); // revives
     G.drawHeldHud(ctx);
     G.drawBuffHud(ctx);
+    drawBelowMarkers(W, H);
 
     const rx = W - pad - (G.isTouch() ? 54 / G.ui : 0); // leave room for the touch pause button
     label('BEST', rx, pad, 'right');
@@ -299,7 +372,7 @@
     drawShaftEdges(box);
     G.tower.draw(ctx, t, box, P);
     G.drawShots(ctx);
-    if (G.state === 'play') drawLandingShadow();
+    if (G.state === 'play') { drawLandingShadow(); drawFallGuide(); }
     for (const tr of P.trail) {
       ctx.globalAlpha = (tr.life / 0.2) * 0.4;
       ctx.fillStyle = '#8a4dff';
