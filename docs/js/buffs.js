@@ -36,7 +36,10 @@
     else P.buffs[it.type] = b.time;
     V.sfx.heart();
     G.shake = Math.max(G.shake, 4);
-    G.tower.burst(it.x, it.y, 24, b.color, 4, 200);
+    G.tower.burst(it.x, it.y, 16, b.color, 4, 200);
+    G.tower.flash(it.x, it.y, 30);
+    G.tower.ring(it.x, it.y, b.color, 56, 0.5, 5);
+    G.tower.sparkle(it.x, it.y, b.color, 8, 30);
     G.tower.popup(it.x, it.y - 34, b.name, b.color);
     G.tower.popup(it.x, it.y - 14, b.text, '#f4eaff');
     G.guide.event('buff');
@@ -172,13 +175,11 @@
     V.drawGlow(ctx, x, y, 46, b.color, 0.5 + 0.2 * Math.sin(t * 4));
     ctx.save();
     ctx.translate(x, y);
-    ctx.fillStyle = 'rgba(11,5,24,0.85)';
+    ctx.fillStyle = 'rgba(11,5,24,0.8)';
     ctx.beginPath(); ctx.arc(0, 0, s, 0, TAU); ctx.fill();
-    ctx.strokeStyle = b.color; ctx.lineWidth = 2;
-    ctx.setLineDash([5, 4]); ctx.lineDashOffset = -t * 12;
-    ctx.beginPath(); ctx.arc(0, 0, s + 4, 0, TAU); ctx.stroke();
-    ctx.setLineDash([]);
     icon(ctx, it.type, s, t);
+    const pulse = 1 + Math.sin(t * 3 + it.phase) * 0.04;
+    V.gloss.draw(ctx, V.gloss.bubble(b.color), 0, 0, (s + 5) * pulse, 56); // glass orb around the power-up
     ctx.restore();
   };
   // Shield bubble, wing/boot sparkles and the hook rope, drawn around the player

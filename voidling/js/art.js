@@ -107,6 +107,42 @@
     g.beginPath();
     g.roundRect(w * 0.02, -capH * 0.45, w * 0.96, capH * 0.32, capH * 0.16);
     g.fill();
+
+    // Gloss and life on the cap. Uses its own random stream, so everything above stays exactly
+    // as it was: a wet shine on the cap, a shine on each drip, grass tufts and tiny glowing flowers
+    const rd = V.rng(seed * 7 + 13);
+    const capShine = g.createLinearGradient(0, -capH * 0.55, 0, capH * 0.7);
+    capShine.addColorStop(0, 'rgba(255,255,255,0.35)'); capShine.addColorStop(0.4, 'rgba(255,255,255,0)');
+    capShine.addColorStop(0.75, 'rgba(20,0,40,0)'); capShine.addColorStop(1, 'rgba(20,0,40,0.22)');
+    g.fillStyle = capShine;
+    g.beginPath(); g.roundRect(-w * 0.025, -capH * 0.55, w * 1.05, capH * 1.25, capH * 0.6); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.8)';
+    g.beginPath(); g.ellipse(w * 0.07, -capH * 0.3, capH * 0.5, capH * 0.12, 0, 0, Math.PI * 2); g.fill();
+    const blade = (x, h, lean, color) => {
+      g.fillStyle = color;
+      g.beginPath(); g.moveTo(x - h * 0.16, -capH * 0.3); g.quadraticCurveTo(x + lean * 0.4, -capH * 0.3 - h * 0.6, x + lean, -capH * 0.3 - h);
+      g.quadraticCurveTo(x + lean * 0.3, -capH * 0.3 - h * 0.4, x + h * 0.16, -capH * 0.3); g.closePath(); g.fill();
+    };
+    const room = padTop - capH * 0.3 - 0.4; // space above the cap inside the sprite
+    const tuftH = Math.min(capH * 1.1, 6, room / 1.25);
+    for (let i = 0, n = Math.floor(w / 22); i < n; i++) {
+      const x = w * (0.03 + rd() * 0.94), h = tuftH * (0.6 + rd() * 0.6);
+      blade(x - h * 0.3, h * 0.75, -h * 0.35, pal.top);
+      blade(x + h * 0.3, h * 0.8, h * 0.35, pal.top);
+      blade(x, h, (rd() - 0.5) * h * 0.4, pal.topHi);
+    }
+    const petals = ['#ffd23f', '#ff7fc8', '#8ff0ff', '#ffffff'];
+    for (let i = 0, n = Math.floor(w / 70); i < n; i++) {
+      const r = Math.max(1.2, tuftH * 0.28), x = w * (0.08 + rd() * 0.84), h = Math.min(tuftH * (0.9 + rd() * 0.5), room - r * 1.3);
+      g.strokeStyle = pal.top; g.lineWidth = Math.max(0.6, r * 0.35);
+      g.beginPath(); g.moveTo(x, -capH * 0.3); g.lineTo(x, -capH * 0.3 - h); g.stroke();
+      const c = petals[Math.floor(rd() * petals.length)];
+      V.drawGlow(g, x, -capH * 0.3 - h, r * 3, c === '#ffffff' ? '#e6d6ff' : c, 0.5);
+      g.fillStyle = c;
+      g.beginPath(); g.arc(x, -capH * 0.3 - h, r, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.85)';
+      g.beginPath(); g.arc(x - r * 0.35, -capH * 0.3 - h - r * 0.35, r * 0.35, 0, Math.PI * 2); g.fill();
+    }
     return { canvas: c, ox: padX, oy: padTop, sw: w + padX * 2, sh: c.height / ppu, capH, cap: pal.top };
   };
 

@@ -9,16 +9,23 @@
     const { x, a } = f;
     const y = f.y + Math.sin(t * 2.4 + f.phase) * a * 0.25;
     if (f.type === 'coin') {
-      V.drawGlow(ctx, x, y, a * 2.4, '#ffcc4d', 0.35);
-      const sx = Math.abs(Math.cos(t * 3 + f.phase)) * 0.85 + 0.15;
+      // A spinning gold coin: the face narrows as it turns and its thick edge shows beside it
+      V.drawGlow(ctx, x, y, a * 2.2, '#ffcc4d', 0.3);
+      const ang = t * 3 + f.phase, c = Math.cos(ang), fw = Math.max(0.1, Math.abs(c));
+      ctx.fillStyle = '#9a5a12';
+      ctx.beginPath(); ctx.ellipse(x + Math.sin(ang) * a * 0.17, y, Math.max(a * fw, a * 0.16), a * 0.98, 0, 0, TAU); ctx.fill();
       ctx.save();
       ctx.translate(x, y);
-      ctx.scale(sx, 1);
-      ctx.fillStyle = '#b8741a'; circle(ctx, 0, 0, a); ctx.fill();
-      ctx.fillStyle = '#ffcc4d'; circle(ctx, 0, -a * 0.06, a * 0.86); ctx.fill();
-      ctx.fillStyle = '#ffe58a'; circle(ctx, 0, -a * 0.06, a * 0.55); ctx.fill();
-      ctx.fillStyle = '#e09a2a'; ctx.fillRect(-a * 0.12, -a * 0.4, a * 0.24, a * 0.7);
+      ctx.scale(fw, 1);
+      V.gloss.draw(ctx, V.gloss.coin(), 0, 0, a, 58);
       ctx.restore();
+      const gl = (t * 0.7 + f.phase * 0.53) % 2.4; // now and then a glint flashes on the rim
+      if (gl < 0.4) {
+        const s = a * 1.5 * Math.sin(gl / 0.4 * Math.PI);
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.drawImage(V.gloss.star('#fff3b8'), x - a * 0.45 * fw - s, y - a * 0.5 - s, s * 2, s * 2);
+        ctx.restore();
+      }
     } else if (f.type === 'crystal') {
       V.drawGlow(ctx, x, y, a * 2.6, '#5fe3ff', 0.5);
       ctx.save();
@@ -58,42 +65,57 @@
 
   const dangerAura = (ctx, x, y, a, t) => V.drawGlow(ctx, x, y, a * 2.4, '#ff2050', 0.45 + 0.25 * Math.sin(t * 8));
 
-  V.drawWalker = (ctx, e, t, danger) => {
+  // Bounce light under each alien: a contrasting tint makes the gloss read on any color
+  const rimFor = color => (color === '#ff8ad8' ? '#8ff0ff' : color === '#6bf0ff' ? '#ff9ad5' : '#ffd0f0');
+  V.drawWalker = (ctx, e, t, danger, P) => {
     const { x, y, a } = e;
     if (danger) dangerAura(ctx, x, y, a, t);
-    const bob = Math.abs(Math.sin(t * 9 + e.phase)) * a * 0.12;
+    // Jelly hop: squashed on each touchdown, stretched at the top of the hop
+    const hop = Math.abs(Math.sin(t * 9 + e.phase)), sq = (1 - hop) * 0.13 - hop * 0.06;
     ctx.save();
-    ctx.translate(x, y - bob);
+    ctx.translate(x, y + a * 0.85 - hop * a * 0.14);
     ctx.scale(e.dir, 1);
-    ctx.strokeStyle = e.color; ctx.lineWidth = a * 0.12; ctx.lineCap = 'round';
-    for (const s of [-1, 1]) { // antennae
-      ctx.beginPath(); ctx.moveTo(s * a * 0.3, -a * 0.6); ctx.quadraticCurveTo(s * a * 0.5, -a * 1.2, s * a * 0.25, -a * 1.35); ctx.stroke();
-      V.drawGlow(ctx, s * a * 0.25, -a * 1.35, a * 0.5, '#fff3b8', 0.8);
+    ctx.scale(1 + sq, 1 - sq);
+    ctx.translate(0, -a * 0.85);
+    ctx.strokeStyle = V.mixHex(e.color, '#1a0830', 0.25); ctx.lineWidth = a * 0.12; ctx.lineCap = 'round';
+    const sway = Math.sin(t * 6 + e.phase) * a * 0.08;
+    for (const s of [-1, 1]) { // antennae with shiny bulbs
+      const tx = s * a * 0.25 + sway, ty = -a * 1.35;
+      ctx.beginPath(); ctx.moveTo(s * a * 0.3, -a * 0.6); ctx.quadraticCurveTo(s * a * 0.5, -a * 1.2, tx, ty); ctx.stroke();
+      V.drawGlow(ctx, tx, ty, a * 0.55, '#fff3b8', 0.7);
+      ctx.drawImage(V.gloss.dot('#fff3b8'), tx - a * 0.17, ty - a * 0.17, a * 0.34, a * 0.34);
     }
-    if (e.spikes) { // spiky back: can't be stomped
-      ctx.fillStyle = '#ff3d6e';
+    if (e.spikes) { // spiky back: can't be stomped. Glossy red crystal spikes.
       for (let i = 0; i < 5; i++) {
         const ang = -Math.PI * (0.85 - i * 0.175);
         const bx = Math.cos(ang) * a * 0.8, by = Math.sin(ang) * a * 0.7;
-        ctx.beginPath();
-        ctx.moveTo(bx - Math.sin(ang) * a * 0.18, by + Math.cos(ang) * a * 0.18);
-        ctx.lineTo(bx + Math.cos(ang) * a * 0.55, by + Math.sin(ang) * a * 0.55);
-        ctx.lineTo(bx + Math.sin(ang) * a * 0.18, by - Math.cos(ang) * a * 0.18);
-        ctx.closePath(); ctx.fill();
+        const nx = -Math.sin(ang) * a * 0.18, ny = Math.cos(ang) * a * 0.18;
+        const tipX = bx + Math.cos(ang) * a * 0.6, tipY = by + Math.sin(ang) * a * 0.6;
+        ctx.fillStyle = '#c4123f';
+        ctx.beginPath(); ctx.moveTo(bx + nx, by + ny); ctx.lineTo(tipX, tipY); ctx.lineTo(bx - nx, by - ny); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ff8aa8';
+        ctx.beginPath(); ctx.moveTo(bx + nx * 0.2, by + ny * 0.2); ctx.lineTo(tipX, tipY); ctx.lineTo(bx - nx, by - ny); ctx.closePath(); ctx.fill();
       }
     }
-    ctx.fillStyle = e.color;
-    ctx.beginPath(); ctx.ellipse(0, 0, a, a * 0.85, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
-    ctx.beginPath(); ctx.ellipse(-a * 0.3, -a * 0.35, a * 0.35, a * 0.2, -0.5, 0, TAU); ctx.fill();
-    const eyes = e.eyes;
+    ctx.save();
+    ctx.scale(1, 0.85);
+    V.gloss.draw(ctx, V.gloss.body(e.color, rimFor(e.color)), 0, 0, a, 60);
+    ctx.restore();
+    // Eyes follow the Voidling
+    let lx = 0.6, ly = 0;
+    if (P) {
+      const dx = (P.x - x) * e.dir, dy = P.y - y, d = Math.hypot(dx, dy) || 1;
+      lx = dx / d; ly = dy / d;
+    }
+    const eyes = e.eyes, blink = Math.sin(t * 1.1 + e.phase * 3) > 0.97 ? 0.15 : 1;
     for (let i = 0; i < eyes; i++) {
       const ex = (i - (eyes - 1) / 2) * a * 0.42 + a * 0.15, er = a * (eyes === 1 ? 0.34 : 0.22);
-      ctx.fillStyle = '#ffffff'; circle(ctx, ex, -a * 0.15, er); ctx.fill();
-      ctx.fillStyle = danger ? '#c4002f' : '#1a0b33'; circle(ctx, ex + er * 0.35, -a * 0.12, er * 0.5); ctx.fill();
+      eye(ctx, ex, -a * 0.15, er, er * blink, lx, ly, danger ? '#c4002f' : '#3a1a7a');
     }
     ctx.fillStyle = '#2a0b2a';
-    ctx.beginPath(); ctx.ellipse(a * 0.2, a * 0.35, a * 0.25, danger ? a * 0.16 : a * 0.08, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(a * 0.2, a * 0.36, a * 0.25, danger ? a * 0.16 : a * 0.08, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.ellipse(a * 0.12, a * 0.33, a * 0.07, a * 0.025, 0, 0, TAU); ctx.fill();
     ctx.restore();
   };
 
@@ -109,12 +131,17 @@
       for (let k = 1; k <= 4; k++) ctx.lineTo(i * a * 0.3 + Math.sin(t * 5 + k + i) * a * 0.15, a * 0.1 + k * a * 0.32);
       ctx.stroke();
     }
-    ctx.fillStyle = e.color;
-    ctx.globalAlpha = 0.85;
+    // Translucent glossy bell: bright crown, see-through rim, a curved highlight
+    const bell = ctx.createRadialGradient(-a * 0.3, -a * 0.65, a * 0.05, 0, -a * 0.2, a * 1.15);
+    bell.addColorStop(0, '#ffffff'); bell.addColorStop(0.35, e.color); bell.addColorStop(1, V.mixHex(e.color, '#2a0b4a', 0.45));
+    ctx.fillStyle = bell;
+    ctx.globalAlpha = 0.88;
     ctx.beginPath(); ctx.arc(0, 0, a, Math.PI, 0); ctx.quadraticCurveTo(0, a * 0.35, -a, 0); ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.fillStyle = '#ffffff'; circle(ctx, -a * 0.3, -a * 0.35, a * 0.18); ctx.fill(); circle(ctx, a * 0.3, -a * 0.35, a * 0.18); ctx.fill();
-    ctx.fillStyle = danger ? '#c4002f' : '#1a0b33'; circle(ctx, -a * 0.3, -a * 0.32, a * 0.09); ctx.fill(); circle(ctx, a * 0.3, -a * 0.32, a * 0.09); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = a * 0.09;
+    ctx.beginPath(); ctx.arc(0, 0, a * 0.72, Math.PI * 1.18, Math.PI * 1.45); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; circle(ctx, a * 0.55, -a * 0.45, a * 0.07); ctx.fill();
+    for (const s of [-1, 1]) eye(ctx, s * a * 0.3, -a * 0.3, a * 0.19, a * 0.19, 0, 0.4, danger ? '#c4002f' : '#3a1a7a');
     ctx.restore();
   };
 
@@ -135,8 +162,14 @@
     for (const s of [-1, 1]) { // two jaws
       ctx.save();
       ctx.rotate(s * open * 0.55);
-      ctx.fillStyle = '#e0233f';
+      const lip = ctx.createLinearGradient(0, s * a * 0.8, 0, s * a * 0.1);
+      lip.addColorStop(0, '#a0102c'); lip.addColorStop(0.6, '#ff3352'); lip.addColorStop(1, '#ff8a9c');
+      ctx.fillStyle = lip;
       ctx.beginPath(); ctx.ellipse(0, s * a * 0.25, a * 1.05, a * 0.55, 0, s < 0 ? Math.PI : 0, s < 0 ? TAU : Math.PI); ctx.fill();
+      if (s < 0) { // wet shine on the upper jaw
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = a * 0.09; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.ellipse(0, s * a * 0.25, a * 0.8, a * 0.38, 0, Math.PI * 1.15, Math.PI * 1.45); ctx.stroke();
+      }
       ctx.fillStyle = '#ff7a8f';
       for (let i = 0; i < 5; i++) { circle(ctx, -a * 0.6 + i * a * 0.3, s * a * 0.55, a * 0.06); ctx.fill(); }
       ctx.fillStyle = '#fff4e8';
@@ -160,12 +193,24 @@
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(V.clamp(e.vx / (a * 20), -0.3, 0.3));
-    ctx.fillStyle = 'rgba(160,240,255,0.55)';
+    // Glass dome with a little pilot inside, and a reflection across the glass
+    const dome = ctx.createRadialGradient(-a * 0.2, -a * 0.6, a * 0.05, 0, -a * 0.25, a * 0.6);
+    dome.addColorStop(0, 'rgba(230,255,255,0.85)'); dome.addColorStop(1, 'rgba(110,200,240,0.5)');
+    ctx.fillStyle = dome;
     ctx.beginPath(); ctx.ellipse(0, -a * 0.25, a * 0.55, a * 0.5, 0, Math.PI, TAU); ctx.fill();
-    const body = ctx.createLinearGradient(0, -a * 0.3, 0, a * 0.35);
-    body.addColorStop(0, '#f0ecff'); body.addColorStop(1, '#7a76a8');
+    ctx.fillStyle = '#9dff6b';
+    ctx.beginPath(); ctx.ellipse(0, -a * 0.3, a * 0.2, a * 0.18, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#1a0b33'; circle(ctx, a * 0.06, -a * 0.33, a * 0.06); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = a * 0.07; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.ellipse(0, -a * 0.25, a * 0.4, a * 0.36, 0, Math.PI * 1.15, Math.PI * 1.4); ctx.stroke();
+    // Polished metal hull: bright band on top, dark underside, a hard specular streak
+    const body = ctx.createLinearGradient(0, -a * 0.36, 0, a * 0.36);
+    body.addColorStop(0, '#ffffff'); body.addColorStop(0.35, '#d8d2ff'); body.addColorStop(0.55, '#8c86c0'); body.addColorStop(1, '#3a3462');
     ctx.fillStyle = body;
     ctx.beginPath(); ctx.ellipse(0, 0, a * 1.2, a * 0.36, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#2a2450'; ctx.lineWidth = a * 0.05; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.beginPath(); ctx.ellipse(-a * 0.45, -a * 0.17, a * 0.32, a * 0.05, -0.08, 0, TAU); ctx.fill();
     for (let i = 0; i < 5; i++) {
       const on = Math.floor(t * 6 + i) % 2 === 0;
       ctx.fillStyle = on ? '#ff4f7a' : '#5fe3ff';
@@ -197,10 +242,11 @@
       ctx.lineTo(s * a * 0.6, a * 0.4);
       ctx.closePath(); ctx.fill();
     }
-    ctx.fillStyle = '#2a0f40';
-    circle(ctx, 0, 0, a * 0.8); ctx.fill();
+    V.gloss.draw(ctx, V.gloss.body('#3a1660', '#ff4f7a'), 0, 0, a * 0.8, 60);
     ctx.fillStyle = '#ff3d6e';
     for (const s of [-1, 1]) { circle(ctx, s * a * 0.3, -a * 0.12, a * 0.16); ctx.fill(); }
+    ctx.fillStyle = '#ffffff';
+    for (const s of [-1, 1]) { circle(ctx, s * a * 0.3 - a * 0.05, -a * 0.17, a * 0.05); ctx.fill(); }
     ctx.fillStyle = '#ffffff';
     for (const s of [-1, 1]) {
       ctx.beginPath(); ctx.moveTo(s * a * 0.22, a * 0.3); ctx.lineTo(s * a * 0.1, a * 0.3); ctx.lineTo(s * a * 0.16, a * 0.52); ctx.closePath(); ctx.fill();
@@ -209,18 +255,10 @@
   };
 
   V.drawHeart = (ctx, x, y, s, alpha = 1) => {
-    ctx.save();
-    ctx.globalAlpha *= alpha;
-    ctx.translate(x, y);
-    ctx.fillStyle = '#ff4f7a';
-    ctx.beginPath();
-    ctx.moveTo(0, s * 0.9);
-    ctx.bezierCurveTo(-s * 1.4, -s * 0.1, -s * 0.7, -s * 1.1, 0, -s * 0.4);
-    ctx.bezierCurveTo(s * 0.7, -s * 1.1, s * 1.4, -s * 0.1, 0, s * 0.9);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.beginPath(); ctx.ellipse(-s * 0.42, -s * 0.38, s * 0.22, s * 0.14, -0.6, 0, TAU); ctx.fill();
-    ctx.restore();
+    const prev = ctx.globalAlpha, k = s / 48;
+    ctx.globalAlpha = prev * alpha;
+    ctx.drawImage(V.gloss.heart(), x - 64 * k, y - 70 * k, 128 * k, 128 * k);
+    ctx.globalAlpha = prev;
   };
 
   // Diamond: a revive. Brilliant-cut gem with a twinkle; empty = outline for HUD slots.
@@ -285,6 +323,18 @@
     ctx.beginPath();
     ctx.moveTo(x, y - 62); ctx.lineTo(x + 11, y - 46); ctx.lineTo(x + 8, y - 16); ctx.lineTo(x - 8, y - 16); ctx.lineTo(x - 11, y - 46);
     ctx.closePath(); ctx.fill();
+    // Facet shine
+    ctx.fillStyle = lit ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)';
+    ctx.beginPath(); ctx.moveTo(x, y - 62); ctx.lineTo(x - 11, y - 46); ctx.lineTo(x - 5, y - 44); ctx.closePath(); ctx.fill();
+    ctx.fillRect(x - 6, y - 40, 2, 18);
+    if (lit) { // sparkles drifting up the beam
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 5; i++) {
+        const p = (t * 0.35 + i / 5) % 1, s = 7 * Math.sin(p * Math.PI);
+        ctx.drawImage(V.gloss.star('#bff6ff'), x + Math.sin(t * 2 + i * 2.3) * 12 - s, y - 30 - p * 190 - s, s * 2, s * 2);
+      }
+      ctx.restore();
+    }
   };
 
   // A strip of red crystal spikes along the top of a platform
@@ -354,39 +404,46 @@
   };
 
   // The Voidling: a scrap of living void with a violet rim and big curious eyes
+  // Shiny cartoon eye: white with a soft lower shade, violet iris, black pupil, two glints
+  // (lx, ly = where it looks, -1..1)
+  const eye = (ctx, x, y, rx, ry, lx, ly, iris = '#3a1a7a') => {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(160,130,220,0.35)';
+    ctx.beginPath(); ctx.ellipse(x, y + ry * 0.45, rx * 0.85, ry * 0.45, 0, 0, Math.PI); ctx.fill();
+    if (ry < rx * 0.3) return; // blinking
+    const px = x + lx * rx * 0.38, py = y + ly * ry * 0.3;
+    ctx.fillStyle = iris;
+    ctx.beginPath(); ctx.ellipse(px, py, rx * 0.58, Math.min(ry, rx) * 0.62, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#0a0418';
+    ctx.beginPath(); ctx.ellipse(px, py, rx * 0.34, Math.min(ry, rx) * 0.38, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    circle(ctx, px - rx * 0.22, py - ry * 0.22, rx * 0.2); ctx.fill();
+    circle(ctx, px + rx * 0.18, py + ry * 0.18, rx * 0.09); ctx.fill();
+  };
+  V.drawEye = eye;
+
   V.drawPlayer = (ctx, P, t) => {
     const r = P.r;
     if (P.inv > 0 && Math.floor(t * 20) % 2 === 0) return;
-    V.drawGlow(ctx, P.x, P.y, r * 2.6, '#8a4dff', 0.55);
+    V.drawGlow(ctx, P.x, P.y, r * 2.5, '#8a4dff', 0.5);
     ctx.save();
-    ctx.translate(P.x, P.y);
-    const sq = P.squash;
-    ctx.scale(1 + sq, 1 - sq);
-    const body = ctx.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
-    body.addColorStop(0, '#2a1450'); body.addColorStop(0.7, '#0d0620'); body.addColorStop(1, '#05020c');
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    for (let i = 0; i <= 48; i++) { // wobbly edge
-      const ang = i / 48 * TAU, wob = 1 + Math.sin(ang * 5 + t * 6) * 0.03;
-      ctx.lineTo(Math.cos(ang) * r * wob, Math.sin(ang) * r * wob);
-    }
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#b98cff'; ctx.lineWidth = r * 0.07; ctx.stroke();
-    // Tiny stars inside the void
-    ctx.fillStyle = 'rgba(230,214,255,0.8)';
-    for (let i = 0; i < 5; i++) {
-      const ang = i * 2.4 + t * 0.3, d = r * (0.3 + (i % 3) * 0.18);
-      ctx.fillRect(Math.cos(ang) * d, Math.sin(ang) * d + r * 0.2, r * 0.05, r * 0.05);
+    // Anchored at the feet: squash flattens onto the ground, speed stretches, running leans in
+    ctx.translate(P.x, P.y + r);
+    const sq = P.squash, st = P.onGround ? 0 : V.clamp(-P.vy / 1500, -0.1, 0.16);
+    ctx.rotate(V.clamp(P.vx / 175, -1, 1) * 0.1);
+    ctx.scale(1 + sq - st * 0.55, 1 - sq + st);
+    ctx.translate(0, -r);
+    V.gloss.draw(ctx, V.gloss.voidBody(), 0, 0, r, 60);
+    // Stars twinkling inside the void
+    for (let i = 0; i < 6; i++) {
+      const ang = i * 2.4 + t * 0.3, d = r * (0.28 + (i % 3) * 0.17), tw = 0.5 + 0.5 * Math.sin(t * 3 + i * 1.7);
+      const sx = Math.cos(ang) * d, sy = Math.sin(ang) * d * 0.8 + r * 0.25, s = r * (0.035 + tw * 0.035);
+      ctx.fillStyle = `rgba(235,220,255,${0.45 + tw * 0.5})`;
+      ctx.fillRect(sx - s, sy - s * 0.25, s * 2, s * 0.5); ctx.fillRect(sx - s * 0.25, sy - s, s * 0.5, s * 2);
     }
     const f = P.face, blink = (Math.sin(t * 1.3) > 0.985) ? 0.15 : 1;
-    for (const s of [-1, 1]) {
-      const ex = f * r * 0.22 + s * r * 0.3, ey = -r * 0.2;
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.2, r * 0.26 * blink, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#1a0b33';
-      ctx.beginPath(); ctx.ellipse(ex + P.lookX * r * 0.08, ey + P.lookY * r * 0.08, r * 0.1, r * 0.13 * blink, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#ffffff'; circle(ctx, ex + P.lookX * r * 0.08 - r * 0.04, ey - r * 0.06, r * 0.035); ctx.fill();
-    }
+    for (const s of [-1, 1]) eye(ctx, f * r * 0.22 + s * r * 0.3, -r * 0.2, r * 0.21, r * 0.27 * blink, P.lookX, P.lookY);
     const m = P.mouth;
     const mx = f * r * 0.25, my = r * 0.28;
     ctx.fillStyle = '#ff5fa2';

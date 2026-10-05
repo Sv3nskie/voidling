@@ -231,6 +231,8 @@
     if (!G.held() || (gun && !GUNS[P.sel])) P.sel = t;
     it.dead = true;
     V.sfx.pickup();
+    T.ring(it.x, it.y, gun ? gun.color : '#e6d6ff', 30, 0.32, 3);
+    T.sparkle(it.x, it.y, gun ? gun.color : '#e6d6ff', 3, 12);
     T.popup(it.x, it.y - 20, gun ? `${gun.name} +${ADD[t]} SHOTS` : `${THROWN[t].name} ${P.bag[t]}/${CAP[t]}`, gun ? gun.color : '#e6d6ff');
     G.guide.event('pickup');
     if (ORDER.filter(k => P.bag[k] > 0).length > 1) G.guide.show('switch', 'You carry several things now. Press [R] to switch, [SHIFT] to use.');
@@ -267,9 +269,7 @@
     ctx.restore();
   }
   function drawBomb(ctx, x, y, s, t) {
-    ctx.fillStyle = '#1a0b33';
-    ctx.beginPath(); ctx.arc(x, y, s, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#ff7fc8'; ctx.lineWidth = 2; ctx.stroke();
+    V.gloss.draw(ctx, V.gloss.body('#2a1450', '#ff7fc8'), x, y, s, 60);
     ctx.fillStyle = '#ff7fc8';
     ctx.fillRect(x - s * 0.45, y - s * 0.15, s * 0.25, s * 0.3);
     ctx.fillRect(x + s * 0.2, y - s * 0.15, s * 0.25, s * 0.3);
@@ -298,10 +298,8 @@
     } else {
       const g = GUNS[it.type];
       V.drawGlow(ctx, x, y, 36, g.color, 0.45 + 0.15 * Math.sin(t * 4));
-      ctx.fillStyle = 'rgba(230,214,255,0.12)';
-      ctx.strokeStyle = 'rgba(230,214,255,0.75)'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(x, y, 15, 0, TAU); ctx.fill(); ctx.stroke();
-      drawGun(ctx, x - 2, y, 0, 1, it.type);
+      drawGun(ctx, x - 2, y, Math.sin(t * 2 + it.phase) * 0.15, 1, it.type);
+      V.gloss.draw(ctx, V.gloss.bubble(g.color), x, y, 16, 56); // glass bubble over it
     }
   };
   // What the Voidling is holding, plus a dotted arc showing where a throw will land and a

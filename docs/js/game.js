@@ -75,7 +75,7 @@
     Object.assign(G, { surge: { phase: 'calm', t: 30, k: 0 }, lastBest: 0, stallT: 0, stallMul: 1, chain: 0, chainT: -9, hold: false });
     Object.assign(G.wind, { phase: 'calm', t: 3, power: 0, streaks: [] });
     G.flags = {};
-    G.shots = []; G.blasts = [];
+    G.shots = []; G.blasts = []; G.flying = [];
     G.story = { queue: [], cur: null };
     G.guide = new V.Guide(guideApi);
     G.tower.generate(G.cam.y - 1400);
@@ -128,10 +128,12 @@
     if (P.jumpBuf > 0 && !P.hook) {
       if (P.coyote > 0) {
         P.vy = -PH.JUMP * jumpMul; P.coyote = 0; P.jumpBuf = 0; P.jumps = 1; P.onGround = false; P.squash = -0.25;
+        T.puff(P.x, P.y + r, 2, 1, 7);
         V.sfx.jump();
       } else if (P.jumps < maxJumps) {
         P.vy = -PH.DJUMP * jumpMul; P.jumps = Math.max(P.jumps, 1) + 1; P.jumpBuf = 0; P.squash = -0.2;
         T.burst(P.x, P.y + r, 10, '#b98cff', 3, 120);
+        T.ring(P.x, P.y + r * 0.6, '#c9a2ff', 30, 0.32, 3);
         V.sfx.djump();
         G.guide.event('djump');
       }
@@ -156,7 +158,7 @@
     P.x += P.vx * dt; P.y += P.vy * dt;
     if (P.x < -HALF + r) { P.x = -HALF + r; P.vx = Math.max(0, P.vx); }
     if (P.x > HALF - r) { P.x = HALF - r; P.vx = Math.min(0, P.vx); }
-    const was = P.onGround;
+    const was = P.onGround, fallV = P.vy;
     P.onGround = false;
     if (P.vy >= 0 && !I.down('down')) {
       for (const p of T.plats) {
@@ -179,10 +181,16 @@
     }
     if (P.onGround) {
       P.coyote = 0.12; P.jumps = 0; P.airDash = true;
-      if (!was) { P.squash = 0.28; T.burst(P.x, P.y + r, 6, '#e6d6ff', 3, 80); }
+      if (!was) { // landing: squash and dust, both bigger the harder you land
+        const hard = V.clamp(fallV / 650, 0, 1);
+        P.squash = 0.1 + 0.24 * hard;
+        T.puff(P.x, P.y + r, hard > 0.6 ? 4 : 2, 1.2, 7 + hard * 5);
+      }
     }
     P.inv -= dt;
-    P.squash = V.damp(P.squash, P.gliding ? 0.16 : 0, 12, dt);
+    // Jelly spring: the squash overshoots and wobbles back instead of just fading
+    P.sqv = ((P.sqv || 0) + ((P.gliding ? 0.16 : 0) - P.squash) * 420 * dt) * Math.exp(-16 * dt);
+    P.squash = V.clamp(P.squash + P.sqv * dt, -0.35, 0.4);
     P.mouth = V.damp(P.mouth, 0, 5, dt);
     P.lookX = V.damp(P.lookX, P.face, 8, dt);
     P.lookY = V.damp(P.lookY, V.clamp(P.vy / 500, -1, 1), 8, dt);
@@ -196,6 +204,7 @@
   const bounce = v => {
     const P = G.P;
     P.vy = -v; P.jumps = 1; P.airDash = true; P.onGround = false; P.dashT = 0; P.squash = -0.25;
+    G.tower.ring(P.x, P.y + P.r, '#fff3b8', 34, 0.3, 3);
   };
   G.hurt = fromX => {
     const P = G.P;
@@ -205,6 +214,8 @@
     P.vx = Math.sign(P.x - fromX || 1) * 230; P.vy = -300; P.dashT = 0; P.onGround = false;
     G.shake = 10; G.freeze = 0.08;
     G.tower.burst(P.x, P.y, 16, '#8a4dff', 4, 200);
+    G.tower.ring(P.x, P.y, '#ff4f7a', 38, 0.35, 4);
+    G.tower.splash(P.x, P.y, '#8a4dff', 8, 180);
     V.sfx.hurt();
     if (P.hearts <= 0) G.die('OUT OF HEARTS');
   };
@@ -219,13 +230,20 @@
     if (e.hp > 0) {
       V.sfx.hit();
       T.burst(ex, ey, 8, '#ffffff', 3, 120);
+      T.ring(ex, ey, '#ffffff', e.a * 1.8, 0.25, 3);
       if (e.type === 'saucer') e.vy -= 140;
       return;
     }
     e.dead = true; P.kills++;
     V.sfx.kill();
     if (how === 'stomp') V.sfx.stomp();
-    T.burst(ex, ey, 18, e.color || (e.type === 'maw' ? '#e0233f' : e.type === 'bat' ? '#8a4dff' : '#f0ecff'), 4, 200);
+    // The pop: white flash, a shock ring, a splash of glossy drops in the alien's color, sparkles
+    const goo = e.color || (e.type === 'maw' ? '#e0233f' : e.type === 'bat' ? '#8a4dff' : '#f0ecff');
+    T.flash(ex, ey, e.a * 1.7);
+    T.ring(ex, ey, '#ffffff', e.a * 2.6, 0.32, 4);
+    T.splash(ex, ey, goo, 12, 230);
+    T.sparkle(ex, ey - 6, '#ffe58a', 4, e.a * 1.4);
+    T.burst(ex, ey, 10, goo, 4, 200);
     T.popup(ex, ey - 24, { stomp: 'STOMP!', dash: 'CHOMP!', shot: 'POW!' }[how], '#ffd86b');
     // Kills pay coins (spent at the trader); quick kills in a row add a chain bonus
     G.chain = G.t - G.chainT < 3 ? G.chain + 1 : 1;
@@ -233,7 +251,7 @@
     const bonus = Math.min(G.chain - 1, 5), pay = (KILL_COINS[e.type] || 2) + bonus;
     P.coins += pay;
     T.popup(ex, ey - 46, bonus ? `+${pay} COINS  ·  CHAIN x${G.chain}` : `+${pay} COINS`, '#ffcc4d');
-    T.burst(ex, ey, 8, '#ffcc4d', 3, 140);
+    G.flyCoins(ex, ey, pay); // the coins fly up into your coin counter
     V.sfx.coin();
     if (e.type === 'saucer' && V.chance(0.6)) T.addItem(V.chance(0.5) ? 'spread' : 'blaster', ex, ey);
     else if (V.chance(0.12)) T.addItem('heart', ex, ey - 10);
@@ -296,7 +314,9 @@
         it.dead = true;
         P.diamonds++;
         T.popup(it.x, it.y - 22, `DIAMOND ${P.diamonds}/3`, '#9ff3ff');
-        T.burst(it.x, it.y, 20, '#bff6ff', 3, 160);
+        T.burst(it.x, it.y, 14, '#bff6ff', 3, 160);
+        T.ring(it.x, it.y, '#9ff3ff', 44, 0.45, 4);
+        T.sparkle(it.x, it.y, '#bff6ff', 8, 26);
         V.sfx.heart();
         G.guide.event('diamond');
         G.guide.show('diamondGot', 'Diamond! If you die, it brings you back to your last checkpoint. You can hold 3.');
@@ -308,12 +328,15 @@
       if (it.type === 'heart') {
         if (P.hearts < P.maxHearts) P.hearts++;
         T.popup(it.x, it.y - 10, '+1 HEART', '#ff4f7a');
+        T.ring(it.x, it.y, '#ff7fa8', 30, 0.35, 3);
+        T.sparkle(it.x, it.y, '#ff9ad5', 4, 14);
         V.sfx.heart();
       } else {
         P.coins++;
+        G.flyCoins(it.x, it.y, 1);
+        T.sparkle(it.x, it.y, '#ffe58a', 2, 8);
         V.sfx.coin();
       }
-      T.burst(it.x, it.y, 6, it.type === 'heart' ? '#ff4f7a' : '#ffcc4d', 3, 90);
     }
   };
 
@@ -402,7 +425,9 @@
     if (first) {
       p.lit = true;
       G.checkpoint = { x: cx, y: p.y, zone: p.zone };
-      G.tower.burst(cx, p.y - 30, 30, '#5fe3ff', 4, 220);
+      G.tower.burst(cx, p.y - 30, 20, '#5fe3ff', 4, 220);
+      G.tower.ring(cx, p.y - 34, '#5fe3ff', 110, 0.7, 5);
+      G.tower.sparkle(cx, p.y - 50, '#bff6ff', 10, 50);
       V.sfx.tier();
       G.once('beacon', () => G.say('ANCIENT SIGNAL', 'Beacons push the Void back for a while. Only for a while.', '#ffd86b'));
     }

@@ -231,6 +231,48 @@
     ctx.fillStyle = color; ctx.font = `600 12px ${FONT_B}`;
     ctx.fillText(text, x, y);
   }
+  // Coins fly from where you got them up into the coin counter (HUD coordinates)
+  G.flying = [];
+  G.flyCoins = (wx, wy, value) => {
+    const cam = G.cam, z = cam.zoom, n = Math.min(value, 6);
+    const sx = ((wx - cam.x) * z + G.W / 2) / G.ui, sy = ((wy - cam.y) * z + G.H / 2) / G.ui;
+    for (let i = 0; i < n; i++) G.flying.push({ sx, sy, t: -i * 0.07, v: value / n, bx: V.rand(-50, 50), by: V.rand(-90, -40) });
+  };
+  G.coinBump = 0;
+  function updateHudFx(dt) {
+    for (const f of G.flying) {
+      f.t += dt;
+      if (f.t >= 0.6) { f.done = true; G.coinBump = 1; }
+    }
+    G.flying = G.flying.filter(f => !f.done);
+    G.coinBump = Math.max(0, G.coinBump - dt * 5);
+    for (const h of G.heartFx) h.t += dt;
+    G.heartFx = G.heartFx.filter(h => h.t < 0.5);
+  }
+  // Hearts: they beat, a lost one bursts, a new one pops in
+  G.heartFx = []; let shownHearts = null;
+  function drawHearts(P, pad, t) {
+    if (shownHearts === null || G.state === 'reviving') shownHearts = P.hearts;
+    if (P.hearts < shownHearts) for (let i = P.hearts; i < shownHearts; i++) G.heartFx.push({ i, t: 0, lost: true });
+    if (P.hearts > shownHearts) for (let i = shownHearts; i < P.hearts; i++) G.heartFx.push({ i, t: 0, lost: false });
+    shownHearts = P.hearts;
+    const low = P.hearts <= 1;
+    for (let i = 0; i < P.maxHearts; i++) {
+      const x = pad + 11 + i * 26, y = pad + 70, full = i < P.hearts;
+      let s = 10;
+      if (full) s *= low ? 1 + 0.18 * Math.max(0, Math.sin(t * 9)) : 1 + 0.05 * Math.max(0, Math.sin(t * 3 - i * 0.5));
+      const gain = G.heartFx.find(h => h.i === i && !h.lost);
+      if (gain) s *= gain.t < 0.12 ? gain.t / 0.12 * 1.4 : 1.4 - Math.min(1, (gain.t - 0.12) / 0.2) * 0.4;
+      V.drawHeart(ctx, x, y, s, full ? 1 : 0.18);
+    }
+    for (const h of G.heartFx) if (h.lost) {
+      const k = h.t / 0.5;
+      ctx.globalAlpha = 1 - k;
+      V.drawHeart(ctx, pad + 11 + h.i * 26, pad + 70 - k * 8, 10 * (1 + k * 1.1), 1);
+      ctx.globalAlpha = 1;
+    }
+  }
+
   function drawHud() {
     const P = G.P, W = G.HW, H = G.HH, t = G.t, pad = 18;
     label('HEIGHT', pad, pad);
@@ -238,7 +280,7 @@
     ctx.fillStyle = '#ffcc4d'; ctx.font = `34px ${FONT_D}`;
     ctx.fillText(`${G.meters(P.y)} m`, pad, pad + 14);
     ctx.shadowBlur = 0;
-    for (let i = 0; i < P.maxHearts; i++) V.drawHeart(ctx, pad + 11 + i * 26, pad + 70, 10, i < P.hearts ? 1 : 0.18);
+    drawHearts(P, pad, t);
     for (let i = 0; i < 3; i++) V.drawDiamond(ctx, pad + 11 + i * 26, pad + 95, 9, t, i >= P.diamonds); // revives
     G.drawHeldHud(ctx);
     G.drawBuffHud(ctx);
@@ -248,13 +290,27 @@
     label('BEST', rx, pad, 'right');
     ctx.fillStyle = '#f4eaff'; ctx.font = `20px ${FONT_D}`;
     ctx.fillText(`${Math.max(G.best, P.best)} m`, rx, pad + 14);
-    // Coins buy things at the trader: big gold count with a coin icon, kills underneath
-    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    // Coins buy things at the trader: big gold count with a coin icon, kills underneath.
+    // The count goes up as each flying coin lands, with a little bump.
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffcc4d'; ctx.font = `18px ${FONT_D}`;
-    const coinText = String(P.coins);
-    ctx.fillText(coinText, rx, pad + 40);
-    V.drawFood(ctx, { type: 'coin', x: rx - ctx.measureText(coinText).width - 13, y: pad + 50, a: 8, phase: 0 }, t);
+    const coinText = String(Math.round(P.coins - G.flying.reduce((s, f) => s + f.v, 0)));
+    const bump = 1 + G.coinBump * 0.35, coinW = ctx.measureText(coinText).width;
+    ctx.save();
+    ctx.translate(rx - coinW / 2, pad + 50); ctx.scale(bump, bump);
+    ctx.textAlign = 'center';
+    ctx.fillText(coinText, 0, 0);
+    ctx.restore();
+    const cx = rx - coinW - 13, cy = pad + 50;
+    V.drawFood(ctx, { type: 'coin', x: cx, y: cy, a: 8 * bump, phase: 0 }, t);
+    ctx.textBaseline = 'top';
     label(`KILLS ${P.kills}`, rx, pad + 64, 'right');
+    for (const f of G.flying) { // curve up to the counter, speeding up as it goes
+      if (f.t < 0) continue;
+      const p = Math.pow(f.t / 0.6, 1.5), q = 1 - p;
+      const x = q * q * f.sx + 2 * q * p * (f.sx + f.bx) + p * p * cx, y = q * q * f.sy + 2 * q * p * (f.sy + f.by) + p * p * cy;
+      V.drawFood(ctx, { type: 'coin', x, y, a: 9 - p * 2, phase: f.t * 4 }, t);
+    }
 
     // How far below you the Void is, and whether it is surging or speeding up
     const dist = Math.max(0, Math.floor((G.voidY - P.y - G.R) / M));
@@ -396,12 +452,20 @@
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     V.fx.world(ctx, W, H, cam, z, t); // foreground haze
+    // Popups pop in with an overshoot, sit, then float off; dark outline so they read anywhere
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `16px ${FONT_D}`;
+    ctx.font = `17px ${FONT_D}`; ctx.lineJoin = 'round';
     for (const u of G.tower.popups) {
-      ctx.globalAlpha = V.clamp(u.life * 2, 0, 1);
+      const age = u.max - u.life, s = age < 0.09 ? 0.4 + age / 0.09 * 0.85 : age < 0.2 ? 1.25 - (age - 0.09) / 0.11 * 0.25 : 1;
+      ctx.globalAlpha = V.clamp(u.life * 3, 0, 1);
+      ctx.save();
+      ctx.translate((u.x - cam.x) * z + W / 2, (u.y - cam.y) * z + H / 2);
+      ctx.scale(s, s);
+      ctx.strokeStyle = 'rgba(20,6,40,0.9)'; ctx.lineWidth = 4.5;
+      ctx.strokeText(u.text, 0, 0);
       ctx.fillStyle = u.color;
-      ctx.fillText(u.text, (u.x - cam.x) * z + W / 2, (u.y - cam.y) * z + H / 2);
+      ctx.fillText(u.text, 0, 0);
+      ctx.restore();
     }
     ctx.globalAlpha = 1;
     ctx.strokeStyle = 'rgba(230,214,255,0.35)'; ctx.lineWidth = 1.5;
@@ -470,6 +534,7 @@
     G.shake = Math.max(0, G.shake - dt * 30);
     G.flash = Math.max(0, G.flash - dt);
     updateStory(dt);
+    updateHudFx(dt);
     if (G.banner && (G.banner.t -= dt) <= 0) G.banner = null;
     updateWind(dt);
     G.overT += dt;

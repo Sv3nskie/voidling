@@ -63,7 +63,7 @@
     constructor() { this.reset(); }
     reset() {
       this.plats = []; this.enemies = []; this.items = []; this.bullets = []; this.clouds = [];
-      this.particles = []; this.popups = [];
+      this.particles = []; this.popups = []; this.fx = [];
       this.seed = 1; this.genY = 0; this.last = null; this.zoneMade = 0; this.rows = 0;
       this.rowLog = []; this.xZone = -1; this.xseed = 500000;
     }
@@ -495,9 +495,45 @@
         p.life -= dt;
       }
       this.particles = this.particles.filter(p => p.life > 0);
+      for (const f of this.fx) {
+        if (f.delay > 0) { f.delay -= dt; continue; }
+        f.life -= dt;
+        if (f.vx !== undefined) {
+          const drag = Math.exp(-(f.drag || 0) * dt);
+          f.vx *= drag; f.vy = f.vy * drag + (f.g || 0) * dt;
+          f.x += f.vx * dt; f.y += f.vy * dt;
+        }
+      }
+      this.fx = this.fx.filter(f => f.life > 0);
       for (const u of this.popups) { u.y -= 30 * dt; u.life -= dt; }
       this.popups = this.popups.filter(u => u.life > 0);
     }
+    // ---------- Juice: one-shot effects ----------
+    // Expanding shock ring
+    ring(x, y, color, r1 = 40, life = 0.35, w = 4) { this.fx.push({ k: 'ring', x, y, color, r1, w, life, max: life }); }
+    // Twinkling four-point stars
+    sparkle(x, y, color = '#ffe58a', n = 5, spread = 22) {
+      for (let i = 0; i < n; i++) {
+        const life = V.rand(0.35, 0.65);
+        this.fx.push({ k: 'spark', x: x + V.rand(-1, 1) * spread, y: y + V.rand(-1, 1) * spread * 0.7, vx: 0, vy: -V.rand(15, 50), drag: 2, color, size: V.rand(9, 17), life, max: life, delay: i * 0.04 });
+      }
+    }
+    // Soft dust clouds pushed out sideways (landing, jumping)
+    puff(x, y, n = 2, spread = 1, size = 8) {
+      for (let i = 0; i < n; i++) {
+        const side = n === 1 ? 0 : (i % 2 ? 1 : -1) * (1 + Math.floor(i / 2) * 0.6), life = V.rand(0.3, 0.5);
+        this.fx.push({ k: 'puff', x: x + side * 4, y: y - 2, vx: side * spread * V.rand(45, 80), vy: -V.rand(8, 30), drag: 6, size: size * V.rand(0.8, 1.2), life, max: life });
+      }
+    }
+    // Glossy drops thrown up and falling back (an alien popping)
+    splash(x, y, color, n = 12, speed = 220) {
+      for (let i = 0; i < n; i++) {
+        const a = -Math.PI / 2 + V.rand(-1.4, 1.4), sp = speed * V.rand(0.4, 1), life = V.rand(0.45, 0.8);
+        this.fx.push({ k: 'drop', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 900, drag: 0.6, color, size: V.rand(3.5, 7), life, max: life });
+      }
+    }
+    // Bright white pop
+    flash(x, y, r = 24) { this.fx.push({ k: 'flash', x, y, r, life: 0.2, max: 0.2 }); }
     burst(x, y, n, color, size, speed, g = 0, life = 0.6) {
       for (let i = 0; i < n; i++) {
         const ang = Math.random() * 6.283, sp = speed * V.rand(0.3, 1);
@@ -505,7 +541,11 @@
       }
       if (this.particles.length > 600) this.particles.splice(0, this.particles.length - 600);
     }
-    popup(x, y, text, color) { this.popups.push({ x, y, text, color, life: 0.9 }); }
+    popup(x, y, text, color) {
+      // Stack above a popup that just appeared in the same spot instead of covering it
+      for (let i = 0; i < 4 && this.popups.some(u => u.life > 0.6 && Math.abs(u.x - x) < 80 && Math.abs(u.y - y) < 18); i++) y -= 20;
+      this.popups.push({ x, y, text, color, life: 1, max: 1 });
+    }
 
     // ---------- Rendering (world space) ----------
     draw(ctx, t, box, P) {
@@ -568,7 +608,7 @@
       for (const e of this.enemies) {
         if (e.dead || !vis(e.x, e.y, 60)) continue;
         if (e.hurtT > 0 && Math.floor(t * 30) % 2) continue;
-        if (e.type === 'walker' || e.type === 'spiky') V.drawWalker(ctx, e, t, false);
+        if (e.type === 'walker' || e.type === 'spiky') V.drawWalker(ctx, e, t, false, P);
         else if (e.type === 'maw') V.drawMaw(ctx, e, t, e.bite > 0.5);
         else if (e.type === 'jelly') V.drawFlyer(ctx, e, t, false);
         else if (e.type === 'bat') V.drawBat(ctx, e, t);
@@ -583,10 +623,43 @@
         for (const [ox, oy, r] of c.blobs) ctx.drawImage(CLOUD, c.x + ox - r, c.y + oy - r, r * 2, r * 2);
         ctx.globalAlpha = 1;
       }
+      // Particles: shiny round drops that shrink as they fade
       for (const p of this.particles) {
-        ctx.globalAlpha = V.clamp(p.life / p.max, 0, 1);
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+        const k = V.clamp(p.life / p.max, 0, 1), s = p.size * (0.45 + 0.75 * k);
+        ctx.globalAlpha = Math.min(1, k * 1.8);
+        ctx.drawImage(V.gloss.dot(p.color), p.x - s / 2, p.y - s / 2, s, s);
+      }
+      ctx.globalAlpha = 1;
+      this.drawFx(ctx);
+    }
+    drawFx(ctx) {
+      for (const f of this.fx) {
+        if (f.delay > 0) continue;
+        const k = V.clamp(f.life / f.max, 0, 1), p = 1 - k; // k: life left, p: progress
+        if (f.k === 'ring') {
+          const r = f.r1 * (1 - Math.pow(1 - p, 3));
+          ctx.globalAlpha = k;
+          ctx.strokeStyle = f.color; ctx.lineWidth = f.w * k + 0.6;
+          ctx.beginPath(); ctx.arc(f.x, f.y, Math.max(0.1, r), 0, Math.PI * 2); ctx.stroke();
+        } else if (f.k === 'spark') {
+          const s = f.size * Math.sin(p * Math.PI);
+          ctx.globalAlpha = 1;
+          ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(p * 1.2);
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.drawImage(V.gloss.star(f.color), -s, -s, s * 2, s * 2);
+          ctx.restore();
+        } else if (f.k === 'puff') {
+          const s = f.size * (0.7 + p * 0.9);
+          ctx.globalAlpha = 0.55 * k;
+          ctx.drawImage(V.gloss.puff(), f.x - s, f.y - s, s * 2, s * 2);
+        } else if (f.k === 'drop') {
+          const s = f.size * (0.5 + 0.5 * k);
+          ctx.globalAlpha = Math.min(1, k * 2.5);
+          ctx.drawImage(V.gloss.dot(f.color), f.x - s, f.y - s, s * 2, s * 2);
+        } else if (f.k === 'flash') {
+          ctx.globalAlpha = 1;
+          V.drawGlow(ctx, f.x, f.y, f.r * (1 + p * 0.9), '#ffffff', k);
+        }
       }
       ctx.globalAlpha = 1;
     }
