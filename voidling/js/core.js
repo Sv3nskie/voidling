@@ -1,7 +1,7 @@
 // Voidling core: math helpers, input, audio, glow sprites
 (() => {
   const V = (window.V = window.V || {});
-  V.VERSION = '0.2.0'; // shown on the title screen, so bug reports can say which build
+  V.VERSION = '0.2.1'; // shown on the title screen, so bug reports can say which build
 
   // ---------- Settings (saved on this device) ----------
   // fx = cinematic effects (bloom, film grain, light rays, foreground haze); depth = 3D islands

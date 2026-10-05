@@ -246,17 +246,12 @@
   // UFO shot: a hot glossy orb with a short fading tail
   V.drawBullet = (ctx, b) => {
     V.drawGlow(ctx, b.x, b.y, b.a * 3, '#ff4f7a', 0.9);
-    if (V.art.draw(ctx, 'bullet_enemy', b.x, b.y, { h: b.a * 3, rot: Math.atan2(b.vy, b.vx), t: V.G ? V.G.t : 0 })) return;
+    const t = V.G ? V.G.t : 0;
+    if (V.art.draw(ctx, 'bullet_enemy', b.x, b.y, { h: b.a * 3, rot: Math.atan2(b.vy, b.vx), t })) return;
+    // A hot red fireball with a flickering flame tail
     const sp = Math.hypot(b.vx, b.vy) || 1;
-    for (let i = 1; i <= 4; i++) {
-      const s = b.a * (1 - i * 0.18);
-      ctx.globalAlpha = 0.5 - i * 0.1;
-      ctx.drawImage(V.gloss.dot('#ff4f7a'), b.x - b.vx / sp * i * b.a * 0.9 - s, b.y - b.vy / sp * i * b.a * 0.9 - s, s * 2, s * 2);
-    }
-    ctx.globalAlpha = 1;
-    ctx.drawImage(V.gloss.dot('#ff8aa8'), b.x - b.a, b.y - b.a, b.a * 2, b.a * 2);
-    ctx.fillStyle = '#ffffff';
-    circle(ctx, b.x, b.y, b.a * 0.35); ctx.fill();
+    V.vfx.streak(ctx, b.x, b.y, b.vx / sp, b.vy / sp, t, b.seed || (b.seed = Math.random() * 10),
+      { color: '#ff3b5c', light: '#ffd0a0', len: b.a * 7, w: b.a * 1.2, wisps: 1 });
   };
 
   // Hostile flyer: a little void bat that swoops at you

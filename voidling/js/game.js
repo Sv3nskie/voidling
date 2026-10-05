@@ -96,6 +96,8 @@
     G.tower.flash(x, y, 34);
     G.tower.ring(x, y, '#bff6ff', 60, 0.5, 4);
     G.tower.sparkle(x, y, '#bff6ff', 10, 30);
+    G.tower.zap(x - 20, y - 380, x, y - 4, '#bff6ff', 0.4, 3); // you come back on a lightning strike
+    G.tower.nova(x, y, '#5fe3ff', 46, 5, '#bff6ff', 0.4);
     Object.assign(G, { voidY: y + 500, voidDelay: 3, banner: null, shake: 0, freeze: 0, shots: [], blasts: [] });
     G.hold = true; // nothing attacks and the Void waits until you move
     Object.assign(G, { surge: { phase: 'calm', t: 18, k: 0 }, lastBest: G.P.peak, stallT: 0, stallMul: 1 });
@@ -136,7 +138,11 @@
       } else if (P.jumps < maxJumps) {
         P.vy = -PH.DJUMP * jumpMul; P.jumps = Math.max(P.jumps, 1) + 1; P.jumpBuf = 0; P.squash = -0.2;
         T.burst(P.x, P.y + r, 10, '#b98cff', 3, 120);
-        T.ring(P.x, P.y + r * 0.6, '#c9a2ff', 30, 0.32, 3);
+        // Energy kick: two flat rings under your feet and lightning crackling down from them
+        T.orbit(P.x, P.y + r * 0.8, '#c9a2ff', 30, 8, 0, 0.36);
+        T.orbit(P.x, P.y + r * 1.4, '#5fe3ff', 22, 6, 0, 0.3, 0.05);
+        T.zap(P.x - 6, P.y + r, P.x - 22, P.y + r + 34, '#c9a2ff', 0.16, 1.4);
+        T.zap(P.x + 6, P.y + r, P.x + 20, P.y + r + 30, '#5fe3ff', 0.16, 1.4);
         V.sfx.djump();
         G.guide.event('djump');
       }
@@ -146,6 +152,7 @@
       P.dashT = PH.DASH_T; P.dashCd = 0.3; P.mouth = 1;
       if (!P.onGround) P.airDash = false;
       if (dir) P.face = dir;
+      T.orbit(P.x - P.face * 6, P.y, '#c9a2ff', 7, 22, 0, 0.28); // shock ring left behind as you lunge
       V.sfx.dash();
       G.guide.event('dash');
     }
@@ -208,7 +215,7 @@
   const bounce = v => {
     const P = G.P;
     P.vy = -v; P.jumps = 1; P.airDash = true; P.onGround = false; P.dashT = 0; P.squash = -0.25;
-    G.tower.ring(P.x, P.y + P.r, '#fff3b8', 34, 0.3, 3);
+    G.tower.orbit(P.x, P.y + P.r, '#ffd86b', 34, 9, 0, 0.3);
   };
   G.hurt = fromX => {
     const P = G.P;
@@ -218,7 +225,7 @@
     P.vx = Math.sign(P.x - fromX || 1) * 230; P.vy = -300; P.dashT = 0; P.onGround = false;
     G.shake = 10; G.freeze = 0.08;
     G.tower.burst(P.x, P.y, 16, '#8a4dff', 4, 200);
-    G.tower.ring(P.x, P.y, '#ff4f7a', 38, 0.35, 4);
+    G.tower.nova(P.x, P.y, '#ff4f7a', 40, 5, '#ff8aa8', 0.3); // red crackle
     G.tower.splash(P.x, P.y, '#8a4dff', 8, 180);
     V.sfx.hurt();
     if (P.hearts <= 0) G.die('OUT OF HEARTS');
@@ -426,6 +433,8 @@
       G.tower.burst(cx, p.y - 30, 20, '#5fe3ff', 4, 220);
       G.tower.ring(cx, p.y - 34, '#5fe3ff', 110, 0.7, 5);
       G.tower.sparkle(cx, p.y - 50, '#bff6ff', 10, 50);
+      G.tower.zap(cx + 30, p.y - 420, cx, p.y - 60, '#bff6ff', 0.35, 3); // lightning strikes the crystal
+      G.tower.nova(cx, p.y - 50, '#5fe3ff', 60, 6, '#bff6ff', 0.4);
       V.sfx.tier();
       G.once('beacon', () => G.say('ANCIENT SIGNAL', 'Beacons push the Void back for a while. Only for a while.', '#ffd86b'));
     }

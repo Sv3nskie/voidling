@@ -3,8 +3,13 @@
   const V = window.V, G = V.G;
   const TAU = Math.PI * 2;
   const GUNS = {
-    blaster: { name: 'STAR BLASTER', ammo: 18, cd: 0.14, recoil: 200, color: '#ffd86b' },
-    spread: { name: 'SPREAD GUN', ammo: 10, cd: 0.32, recoil: 260, color: '#ff7fc8' },
+    blaster: { name: 'STAR BLASTER', ammo: 18, cd: 0.14, recoil: 200, color: '#4fc3ff' },
+    spread: { name: 'SPREAD GUN', ammo: 10, cd: 0.32, recoil: 260, color: '#ff4fd8' },
+  };
+  // How each gun's shots look (js/vfx.js): blaster = crackling electric comet, spread = pink plasma
+  const BEAM = {
+    blaster: { color: '#4fc3ff', light: '#c9f6ff', len: 62, w: 5.5, wisps: 2, zap: true },
+    spread: { color: '#ff4fd8', light: '#ffc6f2', len: 44, w: 4.6, wisps: 2 },
   };
   const THROWN = { rock: { name: 'STONE' }, bomb: { name: 'VOID BOMB' } };
   V.GUNS = GUNS;
@@ -162,8 +167,9 @@
     // Blast in stages: white flash, fireball, shock ring, glossy debris, smoke that lingers
     G.blasts.push({ x: s.x, y: s.y, r: BOMB_R, t: 0 });
     T.flash(s.x, s.y, BOMB_R * 0.9);
+    T.fireburst(s.x, s.y, BOMB_R * 0.95, 11); // tongues of fire bursting outward
+    T.nova(s.x, s.y, '#ffb066', BOMB_R * 0.9, 4, '#ffe0b0', 0.35);
     T.ring(s.x, s.y, '#ffd86b', BOMB_R * 1.3, 0.45, 6);
-    T.ring(s.x, s.y, '#ff7fc8', BOMB_R * 0.9, 0.35, 4);
     T.splash(s.x, s.y, '#ff7fc8', 14, 380);
     T.splash(s.x, s.y, '#ffd86b', 10, 320);
     T.smoke(s.x, s.y, 7, BOMB_R * 0.45);
@@ -356,7 +362,7 @@
       const gx = P.x + dx * (14 - kick * 5), gy = P.y + dy * (14 - kick * 5) + 3;
       drawGun(ctx, gx, gy, ang, flip, held.type);
       const m = G.muzzle, age = m ? G.t - m.t : 9;
-      if (age < 0.09) drawMuzzle(ctx, gx + Math.cos(ang) * 15, gy + Math.sin(ang) * 15, ang, age, m);
+      if (age < MUZZLE_T) drawMuzzle(ctx, gx + Math.cos(ang) * 15, gy + Math.sin(ang) * 15, ang, age, m);
       return;
     }
     const hy = P.y - P.r * 1.75 + Math.sin(G.t * 4) * 1.5;
@@ -371,42 +377,25 @@
     }
     ctx.globalAlpha = 1;
   };
-  // Muzzle flash: your 'muzzle_flash' frames, or a bright star burst with a flame cone
+  // Muzzle flash: your 'muzzle_flash' frames, or a star flare with two energy rings around the
+  // barrel sliding forward (the rings sit across the beam, like hoops it shoots through)
+  const MUZZLE_T = 0.13;
   function drawMuzzle(ctx, x, y, ang, age, m) {
     if (V.art.draw(ctx, V.art.pick('muzzle_' + m.type, 'muzzle_flash', 'muzzle'), x, y, { h: 24, rot: ang, age })) return;
-    const k = 1 - age / 0.09;
-    V.drawGlow(ctx, x, y, 22 * k + 6, m.color, 0.9);
-    ctx.save();
-    ctx.translate(x, y); ctx.rotate(ang);
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = '#fff8e0';
-    ctx.beginPath(); ctx.ellipse(7 * k, 0, 11 * k + 3, 3.6 * k + 1, 0, 0, TAU); ctx.fill();
-    const s = 13 * k + 4;
-    ctx.rotate(age * 20);
-    ctx.drawImage(V.gloss.star(m.color), -s, -s, s * 2, s * 2);
-    ctx.restore();
+    const k = 1 - age / MUZZLE_T, e = 1 - k * k, ux = Math.cos(ang), uy = Math.sin(ang);
+    V.vfx.flare(ctx, x, y, 16 + 10 * k, m.color, ang + Math.PI / 4 + age * 6, k);
+    V.vfx.orbit(ctx, x + ux * (4 + e * 10), y + uy * (4 + e * 10), 3 + e * 2, 9 + e * 6, ang, m.color, k, 2);
+    V.vfx.orbit(ctx, x + ux * (10 + e * 18), y + uy * (10 + e * 18), 2 + e * 2, 6 + e * 7, ang, BEAM[m.type].light, k * 0.8, 1.6);
+    if (m.type === 'blaster' && k > 0.5) V.vfx.lightning(ctx, x, y, x + ux * 26 + (Math.random() - 0.5) * 14, y + uy * 26 + (Math.random() - 0.5) * 14, m.color, 1.2, k, 1);
   }
   G.drawShots = ctx => {
     for (const s of G.shots) {
       if (s.kind === 'bolt') {
         const ang = Math.atan2(s.vy, s.vx), sp = Math.hypot(s.vx, s.vy) || 1, ux = s.vx / sp, uy = s.vy / sp;
-        V.drawGlow(ctx, s.x, s.y, 16, s.color, 0.75);
-        // Trail of fading glossy beads behind the bolt
-        const len = Math.min(5, Math.floor((G.t - s.born) * 60));
-        for (let i = 1; i <= len; i++) {
-          const r = 3.4 - i * 0.5;
-          ctx.globalAlpha = 0.7 - i * 0.12;
-          ctx.drawImage(V.gloss.dot(s.color), s.x - ux * i * 6 - r, s.y - uy * i * 6 - r, r * 2, r * 2);
-        }
-        ctx.globalAlpha = 1;
         if (V.art.draw(ctx, V.art.pick('bullet_' + s.gun, 'bullet'), s.x, s.y, { w: 20, rot: ang, t: G.t })) continue;
-        ctx.save();
-        ctx.translate(s.x, s.y); ctx.rotate(ang);
-        ctx.fillStyle = s.color;
-        ctx.beginPath(); ctx.ellipse(-2, 0, 10, 3.6, 0, 0, TAU); ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.ellipse(0, -0.4, 6.5, 1.7, 0, 0, TAU); ctx.fill();
-        ctx.restore();
+        // Energy comet: the tail grows out of the muzzle, then flows and crackles behind the head
+        const style = BEAM[s.gun] || BEAM.blaster, grow = Math.min(1, (G.t - s.born) * 14);
+        V.vfx.streak(ctx, s.x, s.y, ux, uy, G.t, s.seed || (s.seed = Math.random() * 10), Object.assign({}, style, { len: style.len * grow }));
       } else {
         // Thrown things leave fading afterimages along their arc
         s.trail.forEach(([tx, ty], i) => {

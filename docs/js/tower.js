@@ -580,7 +580,7 @@
     hit(x, y, color = '#ffffff', s = 1) {
       if (this.playArt('hit', x, y, { h: 26 * s })) return;
       this.flash(x, y, 9 * s);
-      this.ring(x, y, color, 15 * s, 0.18, 2);
+      this.nova(x, y, color, 17 * s, 2, color, 0.18);
       for (let i = 0; i < 5; i++) {
         const a = Math.random() * Math.PI * 2, life = V.rand(0.12, 0.2);
         this.fx.push({ k: 'streak', x, y, vx: Math.cos(a) * V.rand(160, 300) * s, vy: Math.sin(a) * V.rand(160, 300) * s, drag: 8, color, life, max: life });
@@ -596,7 +596,8 @@
     // The alien bursting: flash, shock ring, glossy splash in its color, sparkles
     pop(x, y, color, a = 14) {
       this.flash(x, y, a * 1.7);
-      this.ring(x, y, '#ffffff', a * 2.6, 0.32, 4);
+      this.nova(x, y, color, a * 3.2, 6); // energy burst: star flare, lightning crackling outward
+      this.orbit(x, y, color, a * 2.6, a * 0.9, -0.3, 0.4);
       this.splash(x, y, color, 12, 230);
       this.sparkle(x, y - 6, '#ffe58a', 4, a * 1.4);
       this.burst(x, y, 10, color, 4, 200);
@@ -642,9 +643,23 @@
         f.alpha = 1 - p * 0.6;
       } else if (e.type === 'bat') f.alpha = 1 - p * 0.8;
     }
+    // ---------- Energy effects (drawn by js/vfx.js) ----------
+    // Burst: a star flare with lightning arcs crackling outward
+    nova(x, y, color, r = 40, arcs = 5, arcColor = '#bff6ff', life = 0.32) {
+      this.fx.push({ k: 'nova', x, y, color, arcColor, r, rot: Math.random() * Math.PI, life, max: life,
+        arcs: Array.from({ length: arcs }, (_, i) => (i + Math.random() * 0.6) / arcs * Math.PI * 2) });
+    }
+    // Expanding energy ring; a small ry makes a flat ring (around your feet)
+    orbit(x, y, color, rx = 30, ry = 8, rot = 0, life = 0.35, delay = 0) { this.fx.push({ k: 'orbit', x, y, color, rx, ry, rot, life, max: life, delay }); }
+    // Lightning strike between two points
+    zap(x1, y1, x2, y2, color = '#bff6ff', life = 0.22, w = 2) { this.fx.push({ k: 'zap', x: x1, y: y1, x2, y2, color, w, life, max: life }); }
+    // Ring of flames bursting outward
+    fireburst(x, y, r = 80, n = 10) { this.fx.push({ k: 'fire', x, y, r, n, seed: Math.random() * 10, life: 0.5, max: 0.5 }); }
     // A UFO going down: fireball, rings, debris and smoke
     blast(x, y, a = 16) {
       this.flash(x, y, a * 3);
+      this.fireburst(x, y, a * 3.4, 9);
+      this.nova(x, y, '#ffd86b', a * 4, 6, '#bff6ff', 0.4);
       this.ring(x, y, '#ffd86b', a * 4, 0.45, 5);
       this.ring(x, y, '#5fe3ff', a * 2.6, 0.35, 3);
       this.splash(x, y, '#d8d2ff', 10, 320);
@@ -787,6 +802,21 @@
         } else if (f.k === 'art') {
           ctx.globalAlpha = 1;
           V.art.draw(ctx, f.name, f.x, f.y, Object.assign({ age: f.max - f.life }, f.o));
+        } else if (f.k === 'nova') {
+          const e = 1 - Math.pow(1 - p, 3);
+          V.vfx.flare(ctx, f.x, f.y, f.r * (0.45 + 0.75 * e), f.color, f.rot + p * 0.7, k);
+          for (const ang of f.arcs) {
+            const d = f.r * (0.4 + 0.95 * e);
+            V.vfx.lightning(ctx, f.x, f.y, f.x + Math.cos(ang) * d, f.y + Math.sin(ang) * d, f.arcColor, 1.5, k, 1);
+          }
+        } else if (f.k === 'orbit') {
+          const e = 1 - Math.pow(1 - p, 2);
+          V.vfx.orbit(ctx, f.x, f.y, f.rx * (0.45 + e), f.ry * (0.45 + e), f.rot, f.color, k, 2.4 * k + 0.6);
+        } else if (f.k === 'zap') {
+          V.vfx.lightning(ctx, f.x, f.y, f.x2, f.y2, f.color, f.w, k, 2);
+        } else if (f.k === 'fire') {
+          const e = 1 - Math.pow(1 - p, 2);
+          for (let i = 0; i < f.n; i++) V.vfx.flame(ctx, f.x, f.y, (i / f.n) * Math.PI * 2 + f.seed, f.r * (0.35 + 0.85 * e), f.r * 0.2, t, f.seed + i * 1.3, k);
         } else if (f.k === 'corpse') {
           ctx.globalAlpha = f.alpha;
           ctx.save();

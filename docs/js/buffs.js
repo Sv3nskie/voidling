@@ -38,7 +38,9 @@
     G.shake = Math.max(G.shake, 4);
     G.tower.burst(it.x, it.y, 16, b.color, 4, 200);
     G.tower.flash(it.x, it.y, 30);
-    G.tower.ring(it.x, it.y, b.color, 56, 0.5, 5);
+    G.tower.nova(it.x, it.y, b.color, 54, 6, '#ffffff', 0.45);
+    G.tower.orbit(it.x, it.y, b.color, 40, 12, 0, 0.5);
+    G.tower.orbit(it.x, it.y, b.color, 12, 40, 0, 0.5, 0.06);
     G.tower.sparkle(it.x, it.y, b.color, 8, 30);
     G.tower.popup(it.x, it.y - 34, b.name, b.color);
     G.tower.popup(it.x, it.y - 14, b.text, '#f4eaff');

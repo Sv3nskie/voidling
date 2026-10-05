@@ -449,7 +449,13 @@
     }
     ctx.globalAlpha = 1;
     G.drawBuffFx(ctx);
-    if (G.state !== 'dead' && G.state !== 'reviving') { V.drawPlayer(ctx, P, t); G.drawHeld(ctx); }
+    if (G.state !== 'dead' && G.state !== 'reviving') {
+      if (P.dashT > 0) for (let i = 0; i < 3; i++) { // electric aura while chomp-dashing
+        const a = Math.random() * Math.PI * 2, d = P.r * V.rand(1.6, 2.6);
+        V.vfx.lightning(ctx, P.x + Math.cos(a) * P.r * 0.6, P.y + Math.sin(a) * P.r * 0.6, P.x + Math.cos(a) * d - P.vx * 0.03, P.y + Math.sin(a) * d, '#c9a2ff', 1.2, 0.9, 0);
+      }
+      V.drawPlayer(ctx, P, t); G.drawHeld(ctx);
+    }
     else if (G.deathFx) V.drawPlayerDeath(ctx, G.deathFx, P.r, t);
     V.drawVoid(ctx, G.voidY, box.x0, box.x1, box.y1, t, P.buffs.freeze > 0, G.surge.k);
 
@@ -533,7 +539,8 @@
         d.shattered = true;
         const T = G.tower;
         T.flash(d.x, d.y, 40);
-        T.ring(d.x, d.y, '#b98cff', 70, 0.5, 5);
+        T.nova(d.x, d.y, '#b98cff', 80, 8, '#e6d6ff', 0.5);
+        T.orbit(d.x, d.y, '#8a4dff', 70, 22, -0.25, 0.5);
         T.splash(d.x, d.y, '#3a1a7a', 14, 300);
         T.splash(d.x, d.y, '#b98cff', 10, 260);
         T.burst(d.x, d.y, 30, '#8a4dff', 5, 300, 0, 1.2);
