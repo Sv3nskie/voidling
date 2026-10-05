@@ -35,6 +35,7 @@
     else if (it.type === 'heartUp') { P.maxHearts = Math.min(8, P.maxHearts + 1); P.hearts = P.maxHearts; }
     else P.buffs[it.type] = b.time;
     V.sfx.heart();
+    V.haptic('medium');
     G.shake = Math.max(G.shake, 4);
     G.tower.burst(it.x, it.y, 16, b.color, 4, 200);
     G.tower.flash(it.x, it.y, 30);

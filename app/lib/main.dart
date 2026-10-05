@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 const voidColor = Color(0xFF0B0518);
+// Test builds only (flutter build apk --dart-define=WEB_DEBUG=true): lets Chrome DevTools on a
+// computer inspect and measure the game running in the app
+const webDebug = bool.fromEnvironment('WEB_DEBUG');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,10 +46,34 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (webDebug) AndroidWebViewController.enableDebugging(true);
     _web = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(voidColor)
+      // The game calls Haptics.postMessage('light' | 'medium' | 'heavy' | 'death')
+      ..addJavaScriptChannel('Haptics', onMessageReceived: (m) => _haptic(m.message))
       ..loadFlutterAsset('assets/game/index.html');
+    final platform = _web.platform;
+    if (platform is AndroidWebViewController) {
+      platform.setMediaPlaybackRequiresUserGesture(false); // sound starts with the first tap
+    }
+  }
+
+  // Phone vibration for hits, kills and landings (the system's own haptic feedback)
+  void _haptic(String kind) {
+    switch (kind) {
+      case 'light':
+        HapticFeedback.lightImpact();
+      case 'medium':
+        HapticFeedback.mediumImpact();
+      case 'heavy':
+        HapticFeedback.heavyImpact();
+      case 'death':
+        HapticFeedback.heavyImpact();
+        Future.delayed(const Duration(milliseconds: 140), HapticFeedback.heavyImpact);
+      default:
+        HapticFeedback.selectionClick();
+    }
   }
 
   @override

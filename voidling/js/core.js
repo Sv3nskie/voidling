@@ -1,12 +1,25 @@
 // Voidling core: math helpers, input, audio, glow sprites
 (() => {
   const V = (window.V = window.V || {});
-  V.VERSION = '0.3.1'; // shown on the title screen, so bug reports can say which build
+  V.VERSION = '0.3.2'; // shown on the title screen, so bug reports can say which build
 
   // ---------- Settings (saved on this device) ----------
   // fx = cinematic effects (bloom, film grain, light rays, foreground haze); depth = 3D islands
-  V.settings = { sound: true, shake: true, fx: true, depth: true };
+  V.settings = { sound: true, shake: true, fx: true, depth: true, vibrate: true };
   try { Object.assign(V.settings, JSON.parse(localStorage.getItem('voidling.settings')) || {}); } catch (e) { /* storage blocked */ }
+  // Phone vibration: kind = 'light' | 'medium' | 'heavy' | 'death'. The Android app does it with
+  // the system's haptics (its Haptics channel); a phone browser uses the vibration API.
+  let lastBuzz = 0;
+  V.haptic = kind => {
+    if (!V.settings.vibrate) return;
+    const now = performance.now();
+    if (now - lastBuzz < 45 && kind === 'light') return; // never a constant rattle
+    lastBuzz = now;
+    try {
+      if (window.Haptics && window.Haptics.postMessage) window.Haptics.postMessage(kind);
+      else if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate({ light: 12, medium: 22, heavy: 40, death: [45, 60, 90] }[kind] || 12);
+    } catch (e) { /* not allowed yet (no tap so far) */ }
+  };
   V.saveSettings = () => { try { localStorage.setItem('voidling.settings', JSON.stringify(V.settings)); } catch (e) { /* storage blocked */ } };
 
   // The tower swaps V.random for its own seeded generator while it builds levels

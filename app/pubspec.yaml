@@ -1,7 +1,7 @@
 name: voidling
 description: "Voidling: a 2D arcade climber in space"
 publish_to: 'none'
-version: 0.1.7+8
+version: 0.3.2+9
 
 environment:
   sdk: ^3.13.2
@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   wakelock_plus: ^1.8.1
   webview_flutter: ^4.14.1
+  webview_flutter_android: ^4.14.1
 
 dev_dependencies:
   flutter_test:
@@ -21,11 +22,15 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   # The web game, copied here by `node tools/build.mjs` (run it before building the app)
+  # (the folder list between the markers is kept up to date by tools/build.mjs)
   assets:
+    # game-assets:start
     - assets/game/
-    - assets/game/js/
-    - assets/game/fonts/
     - assets/game/assets/
+    - assets/game/assets/ai/
+    - assets/game/fonts/
+    - assets/game/js/
+    # game-assets:end
 
 # App icon: `dart run flutter_launcher_icons`
 flutter_launcher_icons:

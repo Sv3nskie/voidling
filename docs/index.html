@@ -140,14 +140,46 @@ body {
 
 #touch { position: fixed; inset: auto 0 0 0; display: none; justify-content: space-between; padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 4; pointer-events: none; }
 #touch .pad { display: flex; gap: 12px; pointer-events: auto; }
+/* Glass buttons, one accent color each (--c = r, g, b); lit while held, dim when there's
+   nothing to use, a badge with how many hooks / shots you have */
 #touch button {
+  --c: 185, 140, 255;
+  position: relative;
   width: 68px; height: 68px; border-radius: 50%;
-  border: 2px solid rgba(185, 140, 255, 0.5);
-  background: rgba(11, 5, 24, 0.45);
-  color: var(--ink);
-  font: 400 0.8rem/1 var(--font-display);
+  border: 2px solid rgba(var(--c), 0.55);
+  background: radial-gradient(circle at 35% 28%, rgba(var(--c), 0.3), rgba(26, 12, 52, 0.55) 55%, rgba(8, 3, 18, 0.62));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.18), inset 0 -6px 12px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+  font: 400 0.78rem/1 var(--font-display); letter-spacing: 0.03em;
+  text-shadow: 0 0 10px rgba(var(--c), 0.9), 0 1px 0 rgba(0, 0, 0, 0.6);
+  transition: transform 0.08s ease, box-shadow 0.12s ease, opacity 0.2s ease;
 }
-#touch button.big { width: 78px; height: 78px; }
+#touch button.big { width: 78px; height: 78px; font-size: 0.9rem; }
+#touch button.on {
+  transform: scale(0.92);
+  background: radial-gradient(circle at 40% 35%, rgba(255, 255, 255, 0.55), rgba(var(--c), 0.75) 45%, rgba(var(--c), 0.35));
+  box-shadow: 0 0 22px rgba(var(--c), 0.85), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+#touch button.off { opacity: 0.38; }
+#touch button[data-n]::after {
+  content: attr(data-n);
+  position: absolute; top: -5px; right: -5px; min-width: 22px; height: 22px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 11px; background: rgb(var(--c)); color: #12061f;
+  font: 400 0.68rem/22px var(--font-display); text-shadow: none; box-shadow: 0 0 10px rgba(var(--c), 0.8);
+}
+#touch [data-act="jump"] { --c: 95, 227, 255; }
+#touch [data-act="chomp"] { --c: 255, 127, 200; }
+#touch [data-act="tshoot"] { --c: 255, 204, 77; }
+#touch [data-act="thook"] { --c: 125, 255, 176; }
+/* ◀ ▶ is one glass track: slide your thumb along it, the side you hold lights up */
+#touch .pad:first-child {
+  gap: 0; align-self: flex-end; border-radius: 999px;
+  border: 2px solid rgba(185, 140, 255, 0.5);
+  background: linear-gradient(180deg, rgba(40, 20, 80, 0.5), rgba(8, 3, 18, 0.62));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.12), 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+#touch .pad:first-child button { width: 78px; border: 0; background: transparent; box-shadow: none; font-size: 1.15rem; }
+#touch .pad:first-child button.on { transform: none; background: radial-gradient(circle, rgba(185, 140, 255, 0.65), rgba(185, 140, 255, 0) 70%); box-shadow: none; }
 #touch .pad.grid { display: grid; grid-template-columns: repeat(2, auto); align-items: end; justify-items: center; }
 @media (pointer: coarse) { #touch { display: flex; } }
 body.touch #touch { display: flex; }
@@ -158,7 +190,8 @@ body { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   display: none; place-items: center;
   width: 42px; height: 42px; border-radius: 50%;
   border: 2px solid rgba(185, 140, 255, 0.5);
-  background: rgba(11, 5, 24, 0.5);
+  background: radial-gradient(circle at 35% 28%, rgba(185, 140, 255, 0.3), rgba(8, 3, 18, 0.6) 60%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.16), 0 3px 10px rgba(0, 0, 0, 0.35);
   color: var(--ink);
   font: 400 0.85rem/1 var(--font-display);
   touch-action: none;
@@ -167,11 +200,9 @@ body.touch.playing #pauseBtn { display: grid; }
 @media (max-height: 500px) {
   #touch button { width: 56px; height: 56px; }
   #touch button.big { width: 64px; height: 64px; }
+  #touch .pad:first-child button { width: 66px; }
 }
 #touch button { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
-#touch button:active, #touch button.on { background: rgba(185, 140, 255, 0.35); }
-#touch .pad:first-child button:active { background: rgba(11, 5, 24, 0.45); } /* the d-pad lights the side you hold, not the one you first touched */
-#touch .pad:first-child button.on { background: rgba(185, 140, 255, 0.35); }
 body:not(.playing) #touch { visibility: hidden; }
 
 /* ---------- Menus: title, pause, run over. Text over the live game, no boxes ---------- */
@@ -339,6 +370,7 @@ body.touch .only-keys { display: none !important; }
       <button class="menu-item opt" type="button" data-set="shake">Screen shake <b></b></button>
       <button class="menu-item opt" type="button" data-set="fx">Cinematic effects <b></b></button>
       <button class="menu-item opt" type="button" data-set="depth">3D islands <b></b></button>
+      <button class="menu-item opt only-touch" type="button" data-set="vibrate">Vibration <b></b></button>
       <button class="menu-item" type="button" data-back>Back</button>
     </nav>
   </div>
@@ -421,6 +453,7 @@ body.touch .only-keys { display: none !important; }
 
 <script src="js/core.js"></script>
 <script src="js/gloss.js"></script>
+<script src="assets/manifest.js"></script>
 <script src="js/assets.js"></script>
 <script src="js/art.js"></script>
 <script src="js/draw.js"></script>

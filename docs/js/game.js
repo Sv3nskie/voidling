@@ -42,7 +42,8 @@
   G.once = (key, fn) => { if (!G.flags[key]) { G.flags[key] = true; fn(); } };
 
   // Touch devices: on-screen buttons show up on the first touch (or on coarse pointers)
-  G.isTouch = () => document.body.classList.contains('touch') || matchMedia('(pointer: coarse)').matches;
+  const coarse = matchMedia('(pointer: coarse)'); // asked every frame, so kept rather than re-parsed
+  G.isTouch = () => coarse.matches || document.body.classList.contains('touch');
   addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
   // The HUD is laid out on a logical screen (HW x HH) that is scaled down on small phones,
   // with room kept free at the bottom for the touch buttons
@@ -195,6 +196,7 @@
         const hard = V.clamp(fallV / 650, 0, 1);
         P.squash = 0.1 + 0.24 * hard;
         T.puff(P.x, P.y + r, hard > 0.6 ? 4 : 2, 1.2, 7 + hard * 5);
+        if (hard > 0.55) V.haptic('light');
       }
     }
     P.inv -= dt;
@@ -228,6 +230,7 @@
     G.tower.nova(P.x, P.y, '#ff4f7a', 40, 5, '#ff8aa8', 0.3); // red crackle
     G.tower.splash(P.x, P.y, '#8a4dff', 8, 180);
     V.sfx.hurt();
+    V.haptic('heavy');
     if (P.hearts <= 0) G.die('OUT OF HEARTS');
   };
   // how: 'stomp' | 'dash' | 'shot' (bullets, thrown rocks and bombs)
@@ -243,10 +246,12 @@
       T.burst(ex, ey, 8, '#ffffff', 3, 120);
       T.ring(ex, ey, '#ffffff', e.a * 1.8, 0.25, 3);
       if (e.type === 'saucer') e.vy -= 140;
+      V.haptic('light');
       return;
     }
     e.dead = true; P.kills++;
     V.sfx.kill();
+    V.haptic('medium');
     if (how === 'stomp') V.sfx.stomp();
     T.kill(e, how, ex, ey); // its death animation (flattened, knocked flying, spiraling down...)
     T.popup(ex, ey - 24, { stomp: 'STOMP!', dash: 'CHOMP!', shot: 'POW!' }[how], '#ffd86b');
@@ -274,6 +279,7 @@
           bounce(PH.STOMP * 1.1); e.squish = 1;
           T.burst(ex, ey, 10, e.glow, 4, 120);
           V.sfx.bounce();
+          V.haptic('light');
           G.guide.event('jelly');
         }
         continue;
@@ -322,6 +328,7 @@
         T.burst(it.x, it.y, 14, '#bff6ff', 3, 160);
         T.ring(it.x, it.y, '#9ff3ff', 44, 0.45, 4);
         T.sparkle(it.x, it.y, '#bff6ff', 8, 26);
+        V.haptic('medium');
         V.sfx.heart();
         G.guide.event('diamond');
         G.guide.show('diamondGot', 'Diamond! If you die, it brings you back to your last checkpoint. You can hold 3.');
@@ -448,6 +455,7 @@
         G.tower.popup(cx, p.y - 105, 'SURGE STOPPED', '#5fe3ff');
       }
       G.shake = 6;
+      V.haptic('medium');
     }
     if (first || touched) G.tower.popup(cx, p.y - 80, `CHECKPOINT ${G.meters(p.y)} m${touched && !p.midCp ? '  +1 HEART' : ''}`, '#5fe3ff');
   };

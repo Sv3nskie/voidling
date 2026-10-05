@@ -19,13 +19,19 @@
     img.src = src;
   });
 
-  // Settings lookup: exact name first, then shorter prefixes (player_run → player)
+  // Settings lookup: exact name first, then shorter prefixes (player_run → player). Asked many
+  // times a frame, so answers are remembered (settings only change while loading).
+  const optCache = new Map();
   const opt = (name, key, def) => {
+    const ck = name + '|' + key;
+    if (optCache.has(ck)) { const v = optCache.get(ck); return v === undefined ? def : v; }
+    let found;
     for (let n = name; n; n = n.includes('_') ? n.slice(0, n.lastIndexOf('_')) : '') {
       const s = settings[n];
-      if (s && s[key] !== undefined) return s[key];
+      if (s && s[key] !== undefined) { found = s[key]; break; }
     }
-    return def;
+    optCache.set(ck, found);
+    return found === undefined ? def : found;
   };
 
   const art = (V.art = {
@@ -94,18 +100,24 @@
   });
 
   async function load() {
+    // The list comes from assets/manifest.js (works everywhere, also file:// in the Android
+    // app) or else assets/manifest.json
+    const pre = window.VOIDLING_ASSETS;
     let files;
-    try {
-      const r = await fetch('assets/manifest.json', { cache: 'no-cache' });
-      if (!r.ok) return;
-      files = (await r.json()).files || [];
-    } catch (e) { return; } // no custom art: the built-in drawings are used
+    if (pre) files = pre.files || [];
+    else {
+      try {
+        const r = await fetch('assets/manifest.json', { cache: 'no-cache' });
+        if (!r.ok) return;
+        files = (await r.json()).files || [];
+      } catch (e) { return; } // no custom art: the built-in drawings are used
+    }
     // Every settings.json is read, deepest folder first, so yours in assets/ has the last word
     const configs = files.filter(f => f.split('/').pop().toLowerCase() === 'settings.json')
       .sort((a, b) => b.split('/').length - a.split('/').length);
     for (const f of configs) {
       try {
-        const s = await (await fetch('assets/' + f, { cache: 'no-cache' })).json();
+        const s = pre && pre.settings && pre.settings[f] ? pre.settings[f] : await (await fetch('assets/' + f, { cache: 'no-cache' })).json();
         for (const [k, v] of Object.entries(s)) settings[k.toLowerCase()] = Object.assign(settings[k.toLowerCase()] || {}, v);
       } catch (e) { console.warn(`assets/${f} is not valid JSON`, e); }
     }
@@ -134,6 +146,7 @@
       if (frames.length) sets.set(name, { frames, name });
     }));
     art.count = sets.size;
+    optCache.clear();
     if (sets.size) console.info(`Voidling: custom art loaded for ${[...sets.keys()].sort().join(', ')}`);
   }
   art.loading = load();

@@ -23,6 +23,7 @@
     G.slow = 0.55;
     G.shake = 12;
     V.sfx.boom();
+    V.haptic('death');
     // A diamond saves you automatically: short revive moment, then back to the last checkpoint
     if (P.diamonds > 0) {
       P.diamonds--;
@@ -617,6 +618,7 @@
       I.endFrame(); // a press counts once, not once per step
     }
     render();
+    G.syncTouch();
     I.endFrame();
     requestAnimationFrame(frame);
   }
@@ -705,18 +707,35 @@
     if (d !== thumbs.get(e.pointerId)) { thumbs.set(e.pointerId, d); dpadSync(); }
   });
   const dpadOff = e => { if (thumbs.delete(e.pointerId)) dpadSync(); };
-  G.releaseTouch = () => { if (thumbs.size) { thumbs.clear(); dpadSync(); } }; // no stuck direction after a pause or death
+  G.releaseTouch = () => { // no stuck direction or lit button after a pause or death
+    if (thumbs.size) { thumbs.clear(); dpadSync(); }
+    touchEl.querySelectorAll('.pad.grid button.on').forEach(b => { b.classList.remove('on'); V.input.release(b.dataset.act); });
+  };
   dpad.addEventListener('pointerup', dpadOff);
   dpad.addEventListener('pointercancel', dpadOff);
   document.querySelectorAll('#touch .pad.grid button').forEach(b => {
     const act = b.dataset.act;
-    const on = e => { e.preventDefault(); V.audio.init(); V.input.press(act); };
-    const off = e => { e.preventDefault(); V.input.release(act); };
+    const on = e => { e.preventDefault(); V.audio.init(); V.input.press(act); b.classList.add('on'); };
+    const off = e => { e.preventDefault(); V.input.release(act); b.classList.remove('on'); };
     b.addEventListener('pointerdown', on);
     b.addEventListener('pointerup', off);
     b.addEventListener('pointercancel', off);
     b.addEventListener('pointerleave', off);
   });
+
+  // HOOK and SHOOT show how many you have and dim when there's nothing to use
+  const hookBtn = touchEl.querySelector('[data-act="thook"]'), shootBtn = touchEl.querySelector('[data-act="tshoot"]');
+  let touchSig = '';
+  G.syncTouch = () => {
+    if (G.state !== 'play' || !G.isTouch()) return;
+    const P = G.P, held = G.held(), sig = `${P.hooks}|${held ? held.type + held.ammo : ''}`;
+    if (sig === touchSig) return;
+    touchSig = sig;
+    hookBtn.classList.toggle('off', !P.hooks);
+    if (P.hooks) hookBtn.dataset.n = P.hooks; else delete hookBtn.dataset.n;
+    shootBtn.classList.toggle('off', !held);
+    if (held) shootBtn.dataset.n = held.ammo; else delete shootBtn.dataset.n;
+  };
 
   window.claude?.hot?.snapshot?.(() => ({ best: G.best }));
   const boot = data => {

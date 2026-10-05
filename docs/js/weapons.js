@@ -177,6 +177,7 @@
     G.flash = Math.max(G.flash, 0.08);
     G.shake = Math.max(G.shake, 14);
     V.sfx.boom();
+    V.haptic('medium');
     for (const e of T.enemies) {
       if (e.dead || e.type === 'jelly') continue;
       const [ex, ey] = enemyPos(e);
