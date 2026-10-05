@@ -16,3 +16,6 @@ Thumbs.db
 
 # Download QR for the Android app (regenerate any time)
 voidling-android-qr.png
+
+# Licensed source art (Freepik packs): kept local, never published. Game-ready sprites go in voidling/assets/
+Graphics/
