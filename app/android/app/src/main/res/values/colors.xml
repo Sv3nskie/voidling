@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The game's background color, so there is no white flash while it starts -->
+    <color name="void_bg">#0B0518</color>
+</resources>

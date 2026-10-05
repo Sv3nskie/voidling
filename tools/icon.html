@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Voidling icon</title>
+<!-- Renders the app icon with the game's own drawing code; tools/make-icons.py saves the PNGs -->
+<script src="../voidling/js/core.js"></script>
+<script src="../voidling/js/draw.js"></script>
+<pre id="out"></pre>
+<script>
+  // mode 'full' = finished icon; Android adaptive icons use two layers instead:
+  // 'bg' = space + Void only, 'fg' = the character alone on transparency, inside the safe zone
+  function icon(size, mode) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d');
+    g.scale(size / 512, size / 512);
+    const fg = mode === 'fg';
+    if (!fg) {
+      const bg = g.createRadialGradient(256, 200, 20, 256, 256, 380);
+      bg.addColorStop(0, '#5a1f9a');
+      bg.addColorStop(0.55, '#24104a');
+      bg.addColorStop(1, '#0b0518');
+      g.fillStyle = bg;
+      g.fillRect(0, 0, 512, 512);
+      const rnd = V.rng(7);
+      g.fillStyle = '#e6d6ff';
+      for (let i = 0; i < 46; i++) {
+        g.globalAlpha = 0.35 + rnd() * 0.65;
+        const s = 1 + rnd() * 2.6;
+        g.fillRect(rnd() * 512, rnd() * 380, s, s);
+      }
+      g.globalAlpha = 1;
+      // The Void rising at the bottom
+      const wave = x => 430 + Math.sin(x * 0.025) * 10 + Math.sin(x * 0.011 + 1) * 14;
+      const vg = g.createLinearGradient(0, 400, 0, 512);
+      vg.addColorStop(0, '#2a0c40');
+      vg.addColorStop(1, '#05020a');
+      g.fillStyle = vg;
+      g.beginPath();
+      g.moveTo(0, 512);
+      for (let x = 0; x <= 512; x += 8) g.lineTo(x, wave(x));
+      g.lineTo(512, 512);
+      g.closePath();
+      g.fill();
+      g.strokeStyle = '#c8a0ff';
+      g.lineWidth = 5;
+      g.beginPath();
+      for (let x = 0; x <= 512; x += 8) g.lineTo(x, wave(x));
+      g.stroke();
+      for (const [ex, ey] of [[120, 478], [392, 470]]) {
+        V.drawGlow(g, ex, ey, 16, '#ff2050', 0.8);
+        g.fillStyle = '#ffd0dc';
+        g.beginPath(); g.arc(ex - 9, ey, 4, 0, 7); g.arc(ex + 9, ey, 4, 0, 7); g.fill();
+      }
+    }
+    if (mode !== 'bg') {
+      const P = { x: 256, y: fg ? 262 : 250, r: fg ? 128 : 140, squash: 0, face: 1, lookX: 0.5, lookY: -0.3, mouth: 0.35, inv: 0 };
+      const glow = V.drawGlow;
+      if (fg) V.drawGlow = () => {}; // additive glow looks noisy on a transparent layer
+      V.drawPlayer(g, P, 0.3);
+      V.drawGlow = glow;
+    }
+    return c.toDataURL('image/png');
+  }
+  document.getElementById('out').textContent = JSON.stringify({
+    'icon-1024.png': icon(1024, 'full'),
+    'icon-512.png': icon(512, 'full'),
+    'icon-192.png': icon(192, 'full'),
+    'icon-fg-1024.png': icon(1024, 'fg'),
+    'icon-bg-1024.png': icon(1024, 'bg'),
+  });
+</script>

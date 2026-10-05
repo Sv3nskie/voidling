@@ -1,0 +1,206 @@
+<title>Voidling</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;600;700&display=swap">
+<style>
+/* Layout: one full-bleed canvas; HUD is drawn in-canvas, DOM is only for title / game-over cards and touch pads */
+:root {
+  --void: #0b0518;
+  --nebula: #3a1470;
+  --glow: #b98cff;
+  --crystal: #5fe3ff;
+  --gold: #ffcc4d;
+  --danger: #ff4f7a;
+  --ink: #f4eaff;
+  --muted: #b9a6d9;
+  --font-display: "Bungee", "Arial Black", system-ui, sans-serif;
+  --font-body: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+.dot.power { background: #7dffb0; box-shadow: 0 0 10px #7dffb0; }
+.dot.gun { background: var(--crystal); box-shadow: 0 0 10px var(--crystal); border-radius: 3px; }
+
+.screen {
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  padding-inline: 16px; padding-block: 16px;
+  overflow-y: auto;
+  background: radial-gradient(ellipse at 50% 40%, rgba(58, 20, 112, 0.35), rgba(11, 5, 24, 0.82) 70%);
+  z-index: 5;
+}
+.card {
+  display: grid; justify-items: center; gap: 14px; text-align: center; max-width: 36rem;
+  padding: 28px 24px;
+  border-radius: 28px;
+  background: rgba(11, 5, 24, 0.72);
+  box-shadow: 0 0 0 1px rgba(185, 140, 255, 0.25), 0 20px 60px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.logo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.6rem, 11vw, 6rem);
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  text-shadow: 0 0 18px var(--glow), 0 0 48px rgba(185, 140, 255, 0.55), 0 6px 0 var(--nebula);
+  text-wrap: balance;
+}
+.logo.dead { color: #ffd6e0; text-shadow: 0 0 18px var(--danger), 0 6px 0 #3b0a1e; font-size: clamp(2rem, 8vw, 4.2rem); }
+.tag { margin: 0; font-size: clamp(1.05rem, 3.6vw, 1.35rem); color: var(--muted); text-wrap: balance; }
+.tag b { color: var(--gold); font-weight: 600; }
+.stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 28px; margin: 4px 0; }
+.stat { display: grid; gap: 2px; }
+.stat span { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.stat strong { font-family: var(--font-display); font-weight: 400; font-size: 1.5rem; color: var(--gold); font-variant-numeric: tabular-nums; }
+.play {
+  font: 400 1.25rem/1 var(--font-display);
+  color: var(--void);
+  background: linear-gradient(180deg, #ffe58a, var(--gold));
+  border: 0; border-radius: 999px;
+  padding: 16px 40px;
+  box-shadow: 0 6px 0 #b8741a, 0 0 30px rgba(255, 204, 77, 0.45);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.play:hover { transform: translateY(-2px); }
+.play:active { transform: translateY(3px); box-shadow: 0 3px 0 #b8741a; }
+.play:focus-visible { outline: 3px solid var(--crystal); outline-offset: 4px; }
+.keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; margin: 6px 0 0; padding: 0; list-style: none; font-size: 0.95rem; color: var(--muted); }
+.keys kbd {
+  font: 600 0.8rem/1 var(--font-body);
+  color: var(--ink);
+  background: rgba(185, 140, 255, 0.16);
+  border: 1px solid rgba(185, 140, 255, 0.4);
+  border-radius: 6px;
+  padding: 4px 7px;
+}
+.best { margin: 0; font-size: 0.9rem; color: var(--muted); letter-spacing: 0.08em; }
+.rules { display: grid; gap: 8px; margin: 2px 0 4px; padding: 0; list-style: none; text-align: left; font-size: 1rem; color: var(--muted); }
+.rules li { display: flex; align-items: center; gap: 12px; }
+.rules b { color: var(--ink); font-weight: 600; }
+.dot { flex: none; width: 14px; height: 14px; border-radius: 50%; }
+.dot.food { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+.dot.danger { background: var(--danger); box-shadow: 0 0 12px var(--danger); }
+.dot.edible { border: 2px dashed var(--crystal); }
+.dot.hunger { background: linear-gradient(90deg, #8a4dff, #ff7fc8); }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+#contBtn:not([hidden]) + #againBtn { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--glow); }
+@media (max-height: 640px) { .rules { font-size: 0.9rem; gap: 4px; } .card { gap: 10px; } }
+
+#touch { position: fixed; inset: auto 0 0 0; display: none; justify-content: space-between; padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 4; pointer-events: none; }
+#touch .pad { display: flex; gap: 12px; pointer-events: auto; }
+#touch button {
+  width: 68px; height: 68px; border-radius: 50%;
+  border: 2px solid rgba(185, 140, 255, 0.5);
+  background: rgba(11, 5, 24, 0.45);
+  color: var(--ink);
+  font: 400 0.8rem/1 var(--font-display);
+}
+#touch button.big { width: 78px; height: 78px; }
+#touch .pad.grid { display: grid; grid-template-columns: repeat(2, auto); align-items: end; justify-items: center; }
+@media (pointer: coarse) { #touch { display: flex; } }
+body.touch #touch { display: flex; }
+#touch { align-items: flex-end; }
+body { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+#pauseBtn {
+  position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); right: 10px; z-index: 4;
+  display: none; place-items: center;
+  width: 42px; height: 42px; border-radius: 50%;
+  border: 2px solid rgba(185, 140, 255, 0.5);
+  background: rgba(11, 5, 24, 0.5);
+  color: var(--ink);
+  font: 400 0.85rem/1 var(--font-display);
+  touch-action: none;
+}
+body.touch.playing #pauseBtn { display: grid; }
+@media (max-height: 500px) {
+  #touch button { width: 56px; height: 56px; }
+  #touch button.big { width: 64px; height: 64px; }
+}
+#touch button { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+#touch button:active { background: rgba(185, 140, 255, 0.35); }
+@media (prefers-reduced-motion: reduce) { .play { transition: none; } }
+</style>
+
+<canvas id="game" aria-label="Voidling game"></canvas>
+
+<section class="screen" id="title">
+  <div class="card">
+    <h1 class="logo">VOIDLING</h1>
+    <p class="tag">The Void is rising. <b>Climb as high as you can.</b> Everyone climbs the same tower, so compare heights with friends.</p>
+    <ol class="rules">
+      <li><span class="dot food"></span><span><b>Jump on aliens</b> to defeat them and bounce higher.</span></li>
+      <li><span class="dot edible"></span><span><b>Chomp-dash</b> hits enemies from the side and bites through bullets.</span></li>
+      <li><span class="dot gun"></span><span><b>Pick up rocks, bombs and guns.</b> Aim with the mouse and click to throw or shoot.</span></li>
+      <li><span class="dot power"></span><span><b>Find hidden power-ups:</b> shield, super jump, wings, grapple hook and more.</span></li>
+      <li><span class="dot danger"></span><span><b>Spiky aliens and red spikes</b> hurt. You have 3 hearts.</span></li>
+      <li><span class="dot hunger"></span><span><b>Light the beacons</b> for a heart and a checkpoint. Don't let the Void catch you.</span></li>
+    </ol>
+    <button class="play" id="playBtn" type="button">Play</button>
+    <ul class="keys">
+      <li><kbd>←</kbd> <kbd>→</kbd> run</li>
+      <li><kbd>Space</kbd> jump, again to double jump</li>
+      <li>hold <kbd>Space</kbd> float</li>
+      <li><kbd>Shift</kbd> chomp-dash</li>
+      <li><kbd>J</kbd> throw / shoot (auto-aims, or use the mouse)</li>
+      <li><kbd>G</kbd> grapple</li>
+      <li>Gamepad: right stick aims</li>
+      <li><kbd>P</kbd> pause</li>
+      <li><kbd>↓</kbd> drop down</li>
+      <li><kbd>M</kbd> sound</li>
+    </ul>
+    <p class="best" id="bestTitle"></p>
+  </div>
+</section>
+
+<section class="screen" id="over" hidden>
+  <div class="card">
+    <h2 class="logo dead" id="overTitle">THE VOID GOT YOU</h2>
+    <p class="tag" id="overLine"></p>
+    <div class="stats">
+      <div class="stat"><span>Height</span><strong id="oHeight">0 m</strong></div>
+      <div class="stat"><span>Zone</span><strong id="oZone">THE CANYON</strong></div>
+      <div class="stat"><span>Kills</span><strong id="oKills">0</strong></div>
+      <div class="stat"><span>Coins</span><strong id="oCoins">0</strong></div>
+      <div class="stat"><span>Time</span><strong id="oTime">0:00</strong></div>
+    </div>
+    <div class="actions">
+      <button class="play" id="contBtn" type="button" hidden>Continue</button>
+      <button class="play" id="againBtn" type="button">Restart from the bottom</button>
+    </div>
+    <p class="best" id="bestOver"></p>
+  </div>
+</section>
+
+<button id="pauseBtn" type="button" aria-label="Pause">II</button>
+
+<div id="touch" aria-hidden="true">
+  <div class="pad"><button data-act="left">◀</button><button data-act="right">▶</button></div>
+  <div class="pad grid"><button data-act="thook">HOOK</button><button data-act="tshoot">SHOOT</button><button data-act="chomp">CHOMP</button><button class="big" data-act="jump">JUMP</button></div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/art.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/tower.js"></script>
+<script src="js/guide.js"></script>
+<script src="js/game.js"></script>
+<script src="js/weapons.js"></script>
+<script src="js/buffs.js"></script>
+<script src="js/game-ui.js"></script>

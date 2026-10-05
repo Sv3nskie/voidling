@@ -1,0 +1,15 @@
+# Copied in by `node tools/build.mjs` before building the app.
+# (docs/ is committed on purpose: GitHub Pages serves the website from it.)
+app/assets/game/
+
+# Android / Gradle local files
+app/android/.kotlin/
+*.keystore
+*.jks
+key.properties
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

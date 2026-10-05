@@ -1,0 +1,16 @@
+/* Bundled copies of Google Fonts (SIL Open Font License 1.1, see OFL-*.txt),
+   used by the website and the Android app so the game works offline */
+@font-face {
+  font-family: 'Bungee';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(bungee.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Fredoka';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url(fredoka.woff2) format('woff2');
+}
