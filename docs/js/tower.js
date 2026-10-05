@@ -10,9 +10,9 @@
   V.ZONES = [
     { at: 0, name: 'THE CANYON', gap: [60, 92], w: [130, 200], moving: 0, crumble: 0, spike: 0, walker: 0.4, spiky: 0, maw: 0, bat: 0.05, jelly: 0, saucer: 0, wind: 0, void: 18 },
     { at: 100, name: 'FLOATING ISLES', gap: [70, 112], w: [100, 165], moving: 0.1, crumble: 0.22, spike: 0.15, walker: 0.4, spiky: 0.3, maw: 0.12, bat: 0.2, jelly: 0.14, saucer: 0, wind: 0, void: 28 },
-    { at: 300, name: 'ASTEROID BELT', gap: [80, 125], w: [80, 140], moving: 0.35, crumble: 0.2, spike: 0.25, walker: 0.35, spiky: 0.4, maw: 0.15, bat: 0.3, jelly: 0.2, saucer: 13, wind: 0, void: 36 },
-    { at: 600, name: 'THE STORM WALL', gap: [95, 140], w: [46, 82], moving: 0.25, crumble: 0.45, spike: 0.35, walker: 0.25, spiky: 0.55, maw: 0.1, bat: 0.4, jelly: 0.3, saucer: 8, wind: 1, void: 44 },
-    { at: 900, name: 'THE STARFIELD', gap: [85, 130], w: [70, 130], moving: 0.35, crumble: 0.3, spike: 0.3, walker: 0.3, spiky: 0.45, maw: 0.15, bat: 0.35, jelly: 0.25, saucer: 11, wind: 0.45, void: 50 },
+    { at: 300, name: 'ASTEROID BELT', gap: [80, 125], w: [80, 140], moving: 0.35, crumble: 0.2, spike: 0.25, walker: 0.35, spiky: 0.4, maw: 0.15, bat: 0.3, jelly: 0.2, saucer: 24, wind: 0, void: 36 },
+    { at: 600, name: 'THE STORM WALL', gap: [95, 140], w: [46, 82], moving: 0.25, crumble: 0.45, spike: 0.35, walker: 0.25, spiky: 0.55, maw: 0.1, bat: 0.4, jelly: 0.3, saucer: 17, wind: 1, void: 44 },
+    { at: 900, name: 'THE STARFIELD', gap: [85, 130], w: [70, 130], moving: 0.35, crumble: 0.3, spike: 0.3, walker: 0.3, spiky: 0.45, maw: 0.15, bat: 0.35, jelly: 0.25, saucer: 20, wind: 0.45, void: 50 },
   ];
   V.zoneAt = m => {
     let i = 0;
@@ -126,7 +126,8 @@
       } else if (type === 'bat') {
         Object.assign(e, { a: 13, baseX: x, baseY: y, vx: 0, vy: 0, swoopT: 0, restT: V.rand(0.5, 2) });
       } else if (type === 'saucer') {
-        Object.assign(e, { a: 20, hp: 2, vx: 0, vy: 0, fireT: 1.6, life: V.rand(16, 22), t: 0 });
+        // One hit kills it; its first shot comes 3.5 s after it appears
+        Object.assign(e, { a: 20, hp: 1, vx: 0, vy: 0, fireT: 3.5, life: V.rand(13, 16), t: 0, shots: 0, charging: false });
       }
       this.enemies.push(e);
       return e;
@@ -358,22 +359,30 @@
           }
           e.x += e.vx * dt; e.y += e.vy * dt;
         } else if (e.type === 'saucer') {
+          // Drifts in slowly, hovers within double-jump reach, glows red before each shot,
+          // and leaves after 3 shots
           e.t += dt; e.life -= dt;
-          const leaving = e.life <= 0;
-          const tx = leaving ? e.x + (e.x > 0 ? 300 : -300) : P.x + Math.sin(e.t * 0.9) * 120;
-          const ty = leaving ? P.y - 600 : P.y - 175;
+          const leaving = (e.leaving = e.life <= 0 || e.shots >= 3);
+          const tx = leaving ? e.x + (e.x > 0 ? 400 : -400) : P.x + Math.sin(e.t * 0.7) * 90;
+          const ty = leaving ? P.y - 1400 : P.y - 130;
+          const sp = leaving ? 170 : 95;
           const dx = tx - e.x, dy = ty - e.y, d = Math.hypot(dx, dy) || 1;
-          e.vx = V.damp(e.vx, dx / d * Math.min(160, d * 2), 2, dt);
-          e.vy = V.damp(e.vy, dy / d * Math.min(160, d * 2), 2, dt);
+          e.vx = V.damp(e.vx, dx / d * Math.min(sp, d * 1.5), 1.6, dt);
+          e.vy = V.damp(e.vy, dy / d * Math.min(sp, d * 1.5), 1.6, dt);
           e.x += e.vx * dt; e.y += e.vy * dt;
-          e.fireT -= dt;
-          if (!leaving && e.fireT <= 0) {
-            e.fireT = V.rand(1.5, 2.3);
-            const bx = P.x - e.x, by = P.y - e.y, bd = Math.hypot(bx, by) || 1;
-            this.bullets.push({ x: e.x, y: e.y + 8, vx: bx / bd * 230, vy: by / bd * 230, a: 5, life: 4 });
-            V.sfx.zap();
+          if (!leaving) {
+            e.fireT -= dt;
+            if (e.fireT <= 0.7 && !e.charging) { e.charging = true; V.sfx.charge(); }
+            if (e.fireT <= 0) {
+              e.fireT = V.rand(2.6, 3.4); e.charging = false; e.shots++;
+              const bx = P.x - e.x, by = P.y - e.y, bd = Math.hypot(bx, by) || 1;
+              this.bullets.push({ x: e.x, y: e.y + 8, vx: bx / bd * 165, vy: by / bd * 165, a: 5, life: 5 });
+              V.sfx.zap();
+            }
+          } else {
+            e.charging = false;
           }
-          if (e.life < -5) e.dead = true;
+          if (e.life < -6 || (leaving && e.y < P.y - 900)) e.dead = true;
         }
       }
       for (const b of this.bullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; }

@@ -209,6 +209,19 @@
       ctx.fillText(w.phase === 'gust' ? 'WIND' : 'WIND INCOMING', x, y + 44);
     }
 
+    // A saucer still above the screen: red "UFO" marker at the top edge so it never surprises you
+    for (const e of G.tower.enemies) {
+      if (e.type !== 'saucer' || e.dead || e.leaving) continue;
+      const sx = ((e.x - G.cam.x) * G.cam.zoom + G.W / 2) / G.ui, sy = ((e.y - G.cam.y) * G.cam.zoom + G.H / 2) / G.ui;
+      if (sy > 0) continue;
+      const x = V.clamp(sx, 40, W - 40), y = 96;
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 10);
+      ctx.fillStyle = '#ff4f7a';
+      ctx.beginPath(); ctx.moveTo(x, y - 14); ctx.lineTo(x - 11, y + 4); ctx.lineTo(x + 11, y + 4); ctx.closePath(); ctx.fill();
+      ctx.font = `12px ${FONT_D}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText('UFO', x, y + 8);
+      ctx.globalAlpha = 1;
+    }
     if (G.banner) {
       const b = G.banner;
       ctx.globalAlpha = V.clamp(Math.min(b.t * 2, (2.6 - b.t) * 4), 0, 1);

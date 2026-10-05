@@ -170,6 +170,7 @@
     boom() { noise(1.0, 0.5, 500); tone(55, 1.1, 'sine', 0.4, 0.4); },
     tier() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.28, 'triangle', 0.11, 1, i * 0.09)); },
     zap() { tone(1500, 0.12, 'sawtooth', 0.04, 0.4); },
+    charge() { tone(300, 0.7, 'sawtooth', 0.04, 3.5); },
     stomp() { tone(220, 0.12, 'square', 0.1, 2.6); noise(0.1, 0.15, 1800); },
     kill() { tone(660, 0.08, 'triangle', 0.14, 0.5); tone(990, 0.12, 'triangle', 0.1, 1.5, 0.05); },
     hit() { tone(300, 0.08, 'square', 0.08, 0.7); },

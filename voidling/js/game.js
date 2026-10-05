@@ -221,7 +221,7 @@
     if (how === 'stomp') V.sfx.stomp();
     T.burst(ex, ey, 18, e.color || (e.type === 'maw' ? '#e0233f' : e.type === 'bat' ? '#8a4dff' : '#f0ecff'), 4, 200);
     T.popup(ex, ey - 24, { stomp: 'STOMP!', dash: 'CHOMP!', shot: 'POW!' }[how], '#ffd86b');
-    if (e.type === 'saucer' && V.chance(0.45)) T.addItem(V.chance(0.5) ? 'spread' : 'blaster', ex, ey);
+    if (e.type === 'saucer' && V.chance(0.6)) T.addItem(V.chance(0.5) ? 'spread' : 'blaster', ex, ey);
     else if (V.chance(0.12)) T.addItem('heart', ex, ey - 10);
     else if (V.chance(0.5)) T.addItem('coin', ex, ey - 10);
     G.once('kill', () => G.say('GLORP COLONY', 'It took out Gary! Somebody help Gary!', '#9dff6b'));
@@ -252,6 +252,10 @@
       } else if (above && stompable) {
         damage(e, 'stomp', ex, ey);
         bounce(PH.STOMP);
+      } else if (e.type === 'saucer') {
+        // Bumping a saucer from the side or below doesn't hurt; you just bounce off it
+        P.vx = Math.sign(P.x - ex || 1) * 220;
+        P.vy = Math.max(P.vy, 150);
       } else {
         G.hurt(ex);
         if (above) bounce(PH.STOMP * 0.75);
@@ -408,12 +412,13 @@
       P.zone = zi;
       G.banner = { text: z.name, sub: `ZONE ${zi + 1}`, t: 2.6 };
       G.guide.zoneFlash = 2.5;
+      G.saucerT = Math.max(G.saucerT, 10); // a moment to settle in before the first saucer
       V.sfx.tier();
       if (STORY[zi]) G.say(...STORY[zi]);
     }
     if (z.saucer > 0) {
       G.saucerT -= dt;
-      if (G.saucerT <= 0 && G.tower.enemies.filter(e => e.type === 'saucer' && !e.dead).length < 2) {
+      if (G.saucerT <= 0 && !G.tower.enemies.some(e => e.type === 'saucer' && !e.dead)) { // one at a time
         G.saucerT = z.saucer * V.rand(0.8, 1.3);
         G.tower.addEnemy('saucer', V.clamp(P.x + (V.chance(0.5) ? 1 : -1) * 250, -HALF, HALF), G.cam.y - G.view().h * 0.6);
       }

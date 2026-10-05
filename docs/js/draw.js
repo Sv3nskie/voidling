@@ -154,7 +154,9 @@
   V.drawSaucer = (ctx, e, t, danger) => {
     const { x, y, a } = e;
     if (danger) dangerAura(ctx, x, y, a, t);
-    V.drawGlow(ctx, x, y + a * 0.6, a * 2, '#5fe3ff', 0.5);
+    // Charging a shot: a pulsing red glow underneath, so you can see it coming
+    if (e.charging) V.drawGlow(ctx, x, y + a * 0.5, a * 2.4, '#ff2050', 0.55 + 0.4 * Math.sin(t * 22));
+    V.drawGlow(ctx, x, y + a * 0.6, a * 2, e.charging ? '#ff4f7a' : '#5fe3ff', 0.5);
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(V.clamp(e.vx / (a * 20), -0.3, 0.3));

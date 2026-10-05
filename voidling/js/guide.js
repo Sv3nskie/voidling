@@ -54,7 +54,7 @@
         else if (e.type === 'jelly') this.show('jelly', 'Space jellies are bounce pads. Land on one to launch up high!');
         else if (e.type === 'maw') this.show('maw', 'Carnivorous plants bite when you get close. Stomp, dash, shoot or throw a rock at them!');
         else if (e.type === 'bat') this.show('bat', 'Void bats swoop at you. Jump on them or chomp-dash them.');
-        else if (e.type === 'saucer') this.show('saucer', 'Saucers shoot. Your chomp-dash bites right through their shots!');
+        else if (e.type === 'saucer') this.show('saucer', 'UFO! It glows red before it shoots. Jump on it, dash into it or shoot it: one hit takes it down.');
         if (this.tip) return;
       }
       for (const p of tower.plats) {
