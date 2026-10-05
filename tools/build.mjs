@@ -24,6 +24,16 @@ const head = source.slice(0, cut)
   .replace(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^>]*>/, '<link rel="stylesheet" href="fonts/fonts.css">');
 const body = source.slice(cut).trim();
 
+// Custom art: list every file in voidling/assets/ so the game knows what to load (a static site
+// can't list a folder by itself). Your own images just need the right names: see assets/README.md.
+const ASSETS = join(SRC, 'assets');
+mkdirSync(ASSETS, { recursive: true });
+const SKIP = new Set(['readme.md', 'manifest.json', '.ds_store', 'thumbs.db', 'desktop.ini']);
+const assetFiles = listFiles(ASSETS).map(f => relative(ASSETS, f).replaceAll('\\', '/'))
+  .filter(f => !SKIP.has(f.split('/').pop().toLowerCase()) && !f.split('/').pop().startsWith('.')).sort();
+writeFileSync(join(ASSETS, 'manifest.json'), JSON.stringify({ files: assetFiles }, null, 1) + '\n');
+console.log(`assets: ${assetFiles.length ? assetFiles.join(', ') : 'none (built-in art)'}`);
+
 // Content hash, so phones pick up a new version of the offline web app after each deploy
 const hash = createHash('sha256');
 for (const f of listFiles(SRC).sort()) hash.update(readFileSync(f));
@@ -59,7 +69,7 @@ for (const [target, out] of Object.entries(TARGETS)) {
   // Empty the folder rather than deleting it, so a local preview server running in it keeps working
   mkdirSync(out, { recursive: true });
   for (const f of readdirSync(out)) rmSync(join(out, f), { recursive: true, force: true });
-  for (const dir of ['js', 'fonts']) cpSync(join(SRC, dir), join(out, dir), { recursive: true });
+  for (const dir of ['js', 'fonts', 'assets']) cpSync(join(SRC, dir), join(out, dir), { recursive: true });
   writeFileSync(join(out, 'index.html'), page(target));
   if (target === 'web') {
     mkdirSync(join(out, 'icons'));

@@ -313,6 +313,23 @@
       }
 
       const wrap = (v, m) => ((v % m) + m) % m;
+      // Your background art: 'background_zone1'..'background_zone5' or one 'background', filling
+      // the screen and cross-fading between zones. The built-in stars, planets and haze are
+      // skipped unless its setting "layers" is true.
+      const bgNow = V.art.pick(`background_zone${i + 1}`, 'background');
+      if (bgNow) {
+        const cover = (name, a) => {
+          const f = V.art.frame(name, { t });
+          if (!f || a <= 0) return;
+          const s = Math.max(W / f.sw, H / f.sh) * 1.06, w = f.sw * s, h = f.sh * s;
+          ctx.globalAlpha = a;
+          ctx.drawImage(f.img, f.sx, f.sy, f.sw, f.sh, (W - w) / 2 + Math.sin(this.px * 0.0004) * W * 0.02, (H - h) / 2, w, h);
+          ctx.globalAlpha = 1;
+        };
+        const bgPrev = i > 0 ? V.art.pick(`background_zone${i}`, 'background') : null;
+        if (bgPrev && bgPrev !== bgNow && k < 1) { cover(bgPrev, 1); cover(bgNow, k); } else cover(bgNow, 1);
+        if (!V.art.opt(bgNow, 'layers', false)) return;
+      }
       const starA = 0.45 + 0.55 * V.clamp(alt / 300, 0, 1);
       for (const s of this.stars) {
         const x = wrap(s.x - this.px * s.f, 1400), y = wrap(s.y - this.py * s.f, 1000);

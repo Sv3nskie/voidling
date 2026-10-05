@@ -91,8 +91,11 @@
     G.P = Object.assign(freshPlayer(x, y), {
       best: old.best, peak: G.meters(y), diamonds: old.diamonds, coins: old.coins, kills: old.kills, time: old.time,
       bag: { ...old.bag }, sel: old.sel, hooks: old.hooks, // you keep everything you carry and your hooks
-      zone: cp ? cp.zone : 0, inv: 2, maxHearts: old.maxHearts, hearts: 3,
+      zone: cp ? cp.zone : 0, inv: 2, maxHearts: old.maxHearts, hearts: 3, spawnT: 0.4, // reforms from sparkles
     });
+    G.tower.flash(x, y, 34);
+    G.tower.ring(x, y, '#bff6ff', 60, 0.5, 4);
+    G.tower.sparkle(x, y, '#bff6ff', 10, 30);
     Object.assign(G, { voidY: y + 500, voidDelay: 3, banner: null, shake: 0, freeze: 0, shots: [], blasts: [] });
     G.hold = true; // nothing attacks and the Void waits until you move
     Object.assign(G, { surge: { phase: 'calm', t: 18, k: 0 }, lastBest: G.P.peak, stallT: 0, stallMul: 1 });
@@ -188,6 +191,7 @@
       }
     }
     P.inv -= dt;
+    if (P.spawnT > 0) P.spawnT -= dt;
     // Jelly spring: the squash overshoots and wobbles back instead of just fading
     P.sqv = ((P.sqv || 0) + ((P.gliding ? 0.16 : 0) - P.squash) * 420 * dt) * Math.exp(-16 * dt);
     P.squash = V.clamp(P.squash + P.sqv * dt, -0.35, 0.4);
@@ -237,13 +241,7 @@
     e.dead = true; P.kills++;
     V.sfx.kill();
     if (how === 'stomp') V.sfx.stomp();
-    // The pop: white flash, a shock ring, a splash of glossy drops in the alien's color, sparkles
-    const goo = e.color || (e.type === 'maw' ? '#e0233f' : e.type === 'bat' ? '#8a4dff' : '#f0ecff');
-    T.flash(ex, ey, e.a * 1.7);
-    T.ring(ex, ey, '#ffffff', e.a * 2.6, 0.32, 4);
-    T.splash(ex, ey, goo, 12, 230);
-    T.sparkle(ex, ey - 6, '#ffe58a', 4, e.a * 1.4);
-    T.burst(ex, ey, 10, goo, 4, 200);
+    T.kill(e, how, ex, ey); // its death animation (flattened, knocked flying, spiraling down...)
     T.popup(ex, ey - 24, { stomp: 'STOMP!', dash: 'CHOMP!', shot: 'POW!' }[how], '#ffd86b');
     // Kills pay coins (spent at the trader); quick kills in a row add a chain bonus
     G.chain = G.t - G.chainT < 3 ? G.chain + 1 : 1;

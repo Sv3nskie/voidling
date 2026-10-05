@@ -98,6 +98,7 @@
   G.updateWeapons = dt => {
     const P = G.P, I = V.input;
     P.fireCd -= dt;
+    G.recoil = Math.max(0, (G.recoil || 0) - dt * 9);
     const src = I.down('click') ? 'mouse' : I.down('shoot') || I.down('tshoot') ? 'key' : null;
     if (src) G.aim.mode = src;
     if (V.pad.aiming) G.aim.mode = 'key';
@@ -116,39 +117,58 @@
     const P = G.P, base = Math.atan2(dy, dx);
     for (const off of type === 'spread' ? [-0.22, 0, 0.22] : [0]) {
       const a = base + off;
-      G.shots.push({ kind: 'bolt', x: P.x + Math.cos(a) * 16, y: P.y + Math.sin(a) * 16, vx: Math.cos(a) * 780, vy: Math.sin(a) * 780, a: 5, life: 0.8, color: gun.color });
+      G.shots.push({ kind: 'bolt', gun: type, x: P.x + Math.cos(a) * 24, y: P.y + Math.sin(a) * 24, vx: Math.cos(a) * 780, vy: Math.sin(a) * 780, a: 5, life: 0.8, color: gun.color, born: G.t });
     }
     P.fireCd = gun.cd;
     if (Math.abs(dx) > 0.3) P.face = Math.sign(dx);
     // Shooting straight down in the air kicks you upward
     if (dy > 0.7 && !P.onGround) { P.vy = Math.min(P.vy, -gun.recoil); G.guide.event('recoil'); }
     P.mouth = 0.6;
+    P.shotAt = G.t;
+    P.squash = Math.min(P.squash, -0.06) - 0.04; // the body kicks with the shot
+    // Muzzle flash and recoil: the gun jumps back and up, then settles
+    G.muzzle = { t: G.t, type, color: gun.color };
+    G.recoil = 1;
     (type === 'spread' ? V.sfx.spread : V.sfx.shoot)();
-    G.tower.burst(P.x + dx * 18, P.y + dy * 18, 4, gun.color, 3, 90);
+    G.tower.burst(P.x + dx * 26, P.y + dy * 26, 3, gun.color, 2.5, 140);
     G.guide.event('shoot');
     if (--P.bag[type] <= 0) { G.tower.popup(P.x, P.y - 34, `${gun.name} EMPTY`, '#b9a6d9'); ensureSelection(); }
   }
   function throwHeld([dx, dy], type) {
     const P = G.P;
-    G.shots.push({ kind: type, x: P.x, y: P.y - 18, vx: dx * THROW_SPEED + P.vx * 0.3, vy: dy * THROW_SPEED + Math.min(0, P.vy) * 0.2, a: type === 'bomb' ? 9 : 8, life: type === 'bomb' ? 1.4 : 3, spin: 0 });
+    G.shots.push({ kind: type, x: P.x, y: P.y - 18, vx: dx * THROW_SPEED + P.vx * 0.3, vy: dy * THROW_SPEED + Math.min(0, P.vy) * 0.2, a: type === 'bomb' ? 9 : 8, life: type === 'bomb' ? 1.4 : 3, spin: 0, trail: [] });
     P.bag[type]--;
     ensureSelection();
     P.fireCd = 0.25;
     if (Math.abs(dx) > 0.2) P.face = Math.sign(dx);
+    P.shotAt = G.t;
+    P.squash = -0.18; // wind-up stretch
+    G.tower.puff(P.x + dx * 10, P.y - 14, 1, 0.6, 6);
     V.sfx.throw();
     G.guide.event('throw');
   }
   function shatter(s) {
     s.dead = true;
-    G.tower.burst(s.x, s.y, 10, '#b9a0d8', 3, 140);
+    // The stone breaks into glossy shards and a little dust
+    G.tower.splash(s.x, s.y, '#8a70b0', 7, 190);
+    G.tower.splash(s.x, s.y, '#c8b0e8', 4, 150);
+    G.tower.puff(s.x, s.y, 2, 0.8, 7);
+    G.tower.hit(s.x, s.y, '#e6d6ff', 0.8);
     V.sfx.shatter();
   }
   function explode(s) {
     s.dead = true;
     const T = G.tower, P = G.P;
+    // Blast in stages: white flash, fireball, shock ring, glossy debris, smoke that lingers
     G.blasts.push({ x: s.x, y: s.y, r: BOMB_R, t: 0 });
-    T.burst(s.x, s.y, 30, '#ff7fc8', 5, 320);
-    T.burst(s.x, s.y, 20, '#ffd86b', 4, 260);
+    T.flash(s.x, s.y, BOMB_R * 0.9);
+    T.ring(s.x, s.y, '#ffd86b', BOMB_R * 1.3, 0.45, 6);
+    T.ring(s.x, s.y, '#ff7fc8', BOMB_R * 0.9, 0.35, 4);
+    T.splash(s.x, s.y, '#ff7fc8', 14, 380);
+    T.splash(s.x, s.y, '#ffd86b', 10, 320);
+    T.smoke(s.x, s.y, 7, BOMB_R * 0.45);
+    T.burst(s.x, s.y, 16, '#ffd86b', 4, 260);
+    G.flash = Math.max(G.flash, 0.08);
     G.shake = Math.max(G.shake, 14);
     V.sfx.boom();
     for (const e of T.enemies) {
@@ -173,7 +193,11 @@
     for (const s of G.shots) {
       if (s.dead) continue;
       const oy = s.y;
-      if (s.kind !== 'bolt') s.vy += THROW_G * dt;
+      if (s.kind !== 'bolt') {
+        s.vy += THROW_G * dt;
+        s.trail.unshift([s.x, s.y]); if (s.trail.length > 6) s.trail.pop(); // afterimages
+        if (s.kind === 'bomb' && Math.random() < 0.7) T.burst(s.x + Math.cos(s.spin) * 6, s.y - 9, 1, Math.random() < 0.5 ? '#ffd86b' : '#ff7fc8', 2.5, 70); // fuse sparks
+      }
       s.x += s.vx * dt; s.y += s.vy * dt;
       s.life -= dt; s.spin += dt * 10;
       if (s.x < -V.HALF || s.x > V.HALF) {
@@ -182,7 +206,7 @@
       }
       // Islands stop your shots and throws too
       if (T.solidAt(s.x, s.y)) {
-        if (s.kind === 'bolt') { s.dead = true; T.burst(s.x, s.y, 5, s.color, 3, 60); }
+        if (s.kind === 'bolt') { s.dead = true; T.hit(s.x, s.y, s.color); }
         else if (s.kind === 'bomb') explode(s);
         else shatter(s);
         continue;
@@ -192,14 +216,18 @@
         const [ex, ey] = enemyPos(e);
         if (Math.hypot(s.x - ex, s.y - ey) > s.a + e.a * 0.9) continue;
         if (s.kind === 'bomb') explode(s);
-        else { G.damage(e, 'shot', ex, ey); s.kind === 'rock' ? shatter(s) : (s.dead = true); }
+        else {
+          e.knock = Math.sign(s.vx || 1); // which way a kill sends it flying
+          G.damage(e, 'shot', ex, ey);
+          if (s.kind === 'rock') shatter(s); else { s.dead = true; T.hit(s.x, s.y, s.color, 1.3); }
+        }
         break;
       }
       if (s.dead) continue;
       for (const b of T.bullets) {
         if (b.dead || Math.hypot(s.x - b.x, s.y - b.y) > s.a + b.a + 2) continue;
         b.dead = true;
-        T.burst(b.x, b.y, 6, '#ff4f7a', 3, 80);
+        T.hit(b.x, b.y, '#ff4f7a');
         if (s.kind === 'bolt') s.dead = true;
       }
       if (s.dead) continue;
@@ -215,7 +243,7 @@
     }
     G.shots = G.shots.filter(s => !s.dead);
     for (const b of G.blasts) b.t += dt;
-    G.blasts = G.blasts.filter(b => b.t < 0.45);
+    G.blasts = G.blasts.filter(b => b.t < Math.max(0.45, V.art.duration('explosion')));
   }
 
   // Walking over an item adds it to your inventory: guns add shots, stones and bombs stack.
@@ -256,6 +284,7 @@
 
   // ---------- Drawing ----------
   function drawRock(ctx, x, y, s, rot) {
+    if (V.art.draw(ctx, 'rock', x, y, { h: s * 2.2, rot })) return;
     ctx.save();
     ctx.translate(x, y); ctx.rotate(rot);
     ctx.fillStyle = '#6b4f8f';
@@ -268,7 +297,8 @@
     ctx.fillRect(s * 0.1, s * 0.1, s * 0.3, s * 0.3);
     ctx.restore();
   }
-  function drawBomb(ctx, x, y, s, t) {
+  function drawBomb(ctx, x, y, s, t, rot = 0) {
+    if (V.art.draw(ctx, 'bomb', x, y, { h: s * 2.5, t, rot })) return;
     V.gloss.draw(ctx, V.gloss.body('#2a1450', '#ff7fc8'), x, y, s, 60);
     ctx.fillStyle = '#ff7fc8';
     ctx.fillRect(x - s * 0.45, y - s * 0.15, s * 0.25, s * 0.3);
@@ -279,6 +309,7 @@
     ctx.beginPath(); ctx.arc(x + s * 0.55, y - s * 0.95, s * 0.22, 0, TAU); ctx.fill();
   }
   function drawGun(ctx, x, y, ang, flip, type) {
+    if (V.art.draw(ctx, V.art.pick('gun_' + type, 'gun'), x, y, { w: 24, rot: ang, sy: flip, t: G.t })) return;
     ctx.save();
     ctx.translate(x, y); ctx.rotate(ang); ctx.scale(1, flip);
     ctx.fillStyle = '#7a76a8'; ctx.fillRect(-7, 0, 5, 8);
@@ -320,7 +351,12 @@
       ctx.beginPath(); ctx.arc(ex, ey, 2.5, 0, TAU); ctx.fill();
     }
     if (GUNS[held.type]) {
-      drawGun(ctx, P.x + dx * 14, P.y + dy * 14 + 3, Math.atan2(dy, dx), dx < 0 ? -1 : 1, held.type);
+      // Recoil: the gun kicks back along the aim and its muzzle jumps up, then settles
+      const kick = G.recoil || 0, flip = dx < 0 ? -1 : 1, ang = Math.atan2(dy, dx) - flip * kick * 0.4;
+      const gx = P.x + dx * (14 - kick * 5), gy = P.y + dy * (14 - kick * 5) + 3;
+      drawGun(ctx, gx, gy, ang, flip, held.type);
+      const m = G.muzzle, age = m ? G.t - m.t : 9;
+      if (age < 0.09) drawMuzzle(ctx, gx + Math.cos(ang) * 15, gy + Math.sin(ang) * 15, ang, age, m);
       return;
     }
     const hy = P.y - P.r * 1.75 + Math.sin(G.t * 4) * 1.5;
@@ -335,25 +371,68 @@
     }
     ctx.globalAlpha = 1;
   };
+  // Muzzle flash: your 'muzzle_flash' frames, or a bright star burst with a flame cone
+  function drawMuzzle(ctx, x, y, ang, age, m) {
+    if (V.art.draw(ctx, V.art.pick('muzzle_' + m.type, 'muzzle_flash', 'muzzle'), x, y, { h: 24, rot: ang, age })) return;
+    const k = 1 - age / 0.09;
+    V.drawGlow(ctx, x, y, 22 * k + 6, m.color, 0.9);
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = '#fff8e0';
+    ctx.beginPath(); ctx.ellipse(7 * k, 0, 11 * k + 3, 3.6 * k + 1, 0, 0, TAU); ctx.fill();
+    const s = 13 * k + 4;
+    ctx.rotate(age * 20);
+    ctx.drawImage(V.gloss.star(m.color), -s, -s, s * 2, s * 2);
+    ctx.restore();
+  }
   G.drawShots = ctx => {
     for (const s of G.shots) {
       if (s.kind === 'bolt') {
-        V.drawGlow(ctx, s.x, s.y, 14, s.color, 0.8);
-        ctx.strokeStyle = '#fff8e0'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * 0.02, s.y - s.vy * 0.02); ctx.stroke();
-      } else if (s.kind === 'rock') {
-        drawRock(ctx, s.x, s.y, 8, s.spin);
+        const ang = Math.atan2(s.vy, s.vx), sp = Math.hypot(s.vx, s.vy) || 1, ux = s.vx / sp, uy = s.vy / sp;
+        V.drawGlow(ctx, s.x, s.y, 16, s.color, 0.75);
+        // Trail of fading glossy beads behind the bolt
+        const len = Math.min(5, Math.floor((G.t - s.born) * 60));
+        for (let i = 1; i <= len; i++) {
+          const r = 3.4 - i * 0.5;
+          ctx.globalAlpha = 0.7 - i * 0.12;
+          ctx.drawImage(V.gloss.dot(s.color), s.x - ux * i * 6 - r, s.y - uy * i * 6 - r, r * 2, r * 2);
+        }
+        ctx.globalAlpha = 1;
+        if (V.art.draw(ctx, V.art.pick('bullet_' + s.gun, 'bullet'), s.x, s.y, { w: 20, rot: ang, t: G.t })) continue;
+        ctx.save();
+        ctx.translate(s.x, s.y); ctx.rotate(ang);
+        ctx.fillStyle = s.color;
+        ctx.beginPath(); ctx.ellipse(-2, 0, 10, 3.6, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.ellipse(0, -0.4, 6.5, 1.7, 0, 0, TAU); ctx.fill();
+        ctx.restore();
       } else {
-        V.drawGlow(ctx, s.x, s.y, 26, '#ff7fc8', 0.5 + 0.3 * Math.sin(G.t * 30));
-        drawBomb(ctx, s.x, s.y, 9, G.t);
+        // Thrown things leave fading afterimages along their arc
+        s.trail.forEach(([tx, ty], i) => {
+          ctx.globalAlpha = 0.28 - i * 0.045;
+          if (s.kind === 'rock') drawRock(ctx, tx, ty, 8 - i * 0.6, s.spin - i * 0.15);
+          else drawBomb(ctx, tx, ty, 9 - i * 0.6, G.t, s.spin - i * 0.15);
+        });
+        ctx.globalAlpha = 1;
+        if (s.kind === 'rock') drawRock(ctx, s.x, s.y, 8, s.spin);
+        else {
+          V.drawGlow(ctx, s.x, s.y, 26, '#ff7fc8', 0.5 + 0.3 * Math.sin(G.t * 30));
+          drawBomb(ctx, s.x, s.y, 9, G.t, s.spin * 0.4);
+        }
       }
     }
     for (const b of G.blasts) {
-      const k = b.t / 0.45;
-      V.drawGlow(ctx, b.x, b.y, b.r * (0.6 + k), '#ff7fc8', 1 - k);
-      ctx.strokeStyle = `rgba(255,216,107,${1 - k})`;
-      ctx.lineWidth = 4 * (1 - k) + 1;
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.3 + k * 0.9), 0, TAU); ctx.stroke();
+      if (V.art.has('explosion')) { V.art.draw(ctx, 'explosion', b.x, b.y, { h: b.r * 2.3, age: b.t }); continue; }
+      // Fireball: hot white core, orange body, pink rim, swelling and burning out
+      const k = Math.min(1, b.t / 0.45), grow = 1 - Math.pow(1 - Math.min(1, b.t / 0.18), 3);
+      V.drawGlow(ctx, b.x, b.y, b.r * (0.7 + k * 0.6), '#ff7fc8', 1 - k);
+      const fr = b.r * (0.35 + grow * 0.55) * (1 - k * 0.25);
+      const fire = ctx.createRadialGradient(b.x, b.y - fr * 0.2, fr * 0.05, b.x, b.y, fr);
+      fire.addColorStop(0, `rgba(255,255,240,${1 - k})`); fire.addColorStop(0.35, `rgba(255,214,107,${0.95 * (1 - k)})`);
+      fire.addColorStop(0.75, `rgba(255,111,170,${0.8 * (1 - k)})`); fire.addColorStop(1, 'rgba(138,77,255,0)');
+      ctx.fillStyle = fire;
+      ctx.beginPath(); ctx.arc(b.x, b.y, fr, 0, TAU); ctx.fill();
     }
   };
   // Bottom-left item bar: everything you carry with its count; the selected one (used by

@@ -17,8 +17,10 @@
     const P = G.P;
     document.body.classList.remove('playing');
     G.releaseTouch();
-    G.tower.burst(P.x, P.y, 50, '#8a4dff', 5, 300, 0, 1.2);
-    G.shake = 18;
+    // Death: a moment of slow motion while the Voidling swells and flashes, then it shatters
+    G.deathFx = { x: P.x, y: P.y, face: P.face, t: 0, shattered: false };
+    G.slow = 0.55;
+    G.shake = 12;
     V.sfx.boom();
     // A diamond saves you automatically: short revive moment, then back to the last checkpoint
     if (P.diamonds > 0) {
@@ -448,6 +450,7 @@
     ctx.globalAlpha = 1;
     G.drawBuffFx(ctx);
     if (G.state !== 'dead' && G.state !== 'reviving') { V.drawPlayer(ctx, P, t); G.drawHeld(ctx); }
+    else if (G.deathFx) V.drawPlayerDeath(ctx, G.deathFx, P.r, t);
     V.drawVoid(ctx, G.voidY, box.x0, box.x1, box.y1, t, P.buffs.freeze > 0, G.surge.k);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -523,6 +526,20 @@
       G.tower.generate(G.cam.y - G.view().h * 1.5);
       G.tower.cull(G.voidY);
     }
+    const d = G.deathFx;
+    if (d && (G.state === 'dead' || G.state === 'reviving')) {
+      d.t += dt;
+      if (!d.shattered && d.t > (V.art.has('player_die') ? V.art.duration('player_die') : 0.2)) {
+        d.shattered = true;
+        const T = G.tower;
+        T.flash(d.x, d.y, 40);
+        T.ring(d.x, d.y, '#b98cff', 70, 0.5, 5);
+        T.splash(d.x, d.y, '#3a1a7a', 14, 300);
+        T.splash(d.x, d.y, '#b98cff', 10, 260);
+        T.burst(d.x, d.y, 30, '#8a4dff', 5, 300, 0, 1.2);
+        G.shake = 18;
+      }
+    }
     if (G.state === 'reviving' && (G.revive.t += dt) > 2.4) cont(); // diamond revive: back to the checkpoint
     G.tower.update(dt, G.t, G.P, G.hold);
     if (G.state === 'title') updateFlyover(dt); else updateCamera(dt);
@@ -572,7 +589,9 @@
     else if (G.state === 'play' && !G.paused && I.hit('pause')) G.setPaused(true);
     if (G.state === 'shop') G.shopInput();
     for (let i = 0; i < steps && !G.paused; i++) {
-      G.t += dt; step(dt);
+      const sdt = G.slow > 0 ? dt * 0.3 : dt; // slow motion (the moment you die)
+      G.slow = Math.max(0, (G.slow || 0) - dt);
+      G.t += sdt; step(sdt);
       I.endFrame(); // a press counts once, not once per step
     }
     render();

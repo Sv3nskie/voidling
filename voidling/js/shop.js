@@ -104,6 +104,7 @@
 
   // The market stall on the shop island: striped awning, a trader alien behind the counter, a sign
   V.drawShop = (ctx, x, y, t, used, scale = 1) => {
+    if (V.art.draw(ctx, V.art.pick(used ? 'shop_closed' : 'shop', 'shop'), x, y, { h: 90 * scale, anchor: 'bottom', t, alpha: used && !V.art.has('shop_closed') ? 0.6 : 1 })) return;
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(scale, scale);

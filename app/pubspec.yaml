@@ -25,6 +25,7 @@ flutter:
     - assets/game/
     - assets/game/js/
     - assets/game/fonts/
+    - assets/game/assets/
 
 # App icon: `dart run flutter_launcher_icons`
 flutter_launcher_icons:

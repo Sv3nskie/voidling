@@ -39,6 +39,39 @@
     g.fillStyle = gr;
     g.fillRect(0, 0, 128, 128);
   }
+  const G_P = () => V.G && V.G.P;
+  // Your island art (assets/README.md): the first name that exists wins, most specific first.
+  // name_left / name_middle / name_right tile to any width; a plain name stretches to the width.
+  const platformArt = p => {
+    if (!V.art.count) return null;
+    const z = 'zone' + ((p.zone || 0) + 1), ty = p.beacon ? 'beacon' : p.type;
+    for (const n of [`platform_${ty}_${z}`, `platform_${ty}`, `platform_${z}`, 'platform']) {
+      if (V.art.has(n + '_middle')) return { slice: true, key: n + '_middle', l: V.art.pick(n + '_left'), m: n + '_middle', r: V.art.pick(n + '_right') };
+      if (V.art.has(n)) return { slice: false, key: n };
+    }
+    return null;
+  };
+  // surface = how far down the image (0..1) the walkable top edge is
+  const drawPlatformArt = (ctx, p, a, x0, y0, t) => {
+    const surf = V.art.opt(a.key, 'surface', 0.12), k = V.art.opt(a.key, 'scale', 1);
+    if (!a.slice) {
+      const f = V.art.frame(a.key, { t }), over = V.art.opt(a.key, 'overhang', 0.04);
+      const W = p.w * (1 + over * 2), H = W * f.sh / f.sw * k;
+      ctx.drawImage(f.img, f.sx, f.sy, f.sw, f.sh, x0 - p.w * over, y0 - H * surf, W, H);
+      return;
+    }
+    const H = V.art.opt(a.key, 'height', 44) * k, top = y0 - H * surf;
+    const fl = a.l && V.art.frame(a.l, { t }), fm = V.art.frame(a.m, { t }), fr = a.r && V.art.frame(a.r, { t });
+    let lw = fl ? H * fl.sw / fl.sh : 0, rw = fr ? H * fr.sw / fr.sh : 0;
+    if (lw + rw > p.w) { const s = p.w / (lw + rw); lw *= s; rw *= s; }
+    const mw = H * fm.sw / fm.sh, span = p.w - lw - rw;
+    for (let x = 0; x < span - 0.3; x += mw) { // tile the middle, cropping the last piece
+      const w = Math.min(mw, span - x);
+      ctx.drawImage(fm.img, fm.sx, fm.sy, fm.sw * (w / mw), fm.sh, x0 + lw + x, top, w + 0.6, H);
+    }
+    if (fl) ctx.drawImage(fl.img, fl.sx, fl.sy, fl.sw, fl.sh, x0, top, lw + 0.4, H);
+    if (fr) ctx.drawImage(fr.img, fr.sx, fr.sy, fr.sw, fr.sh, x0 + p.w - rw - 0.4, top, rw + 0.4, H);
+  };
   // The shaded body of an island's 3D slab: its sprite with the grassy cap painted one flat,
   // slightly darker grass color (the lit top surface, smooth when the copies stack up) and the
   // rock darkened down its sides. Made once per sprite.
@@ -503,6 +536,8 @@
           f.vx *= drag; f.vy = f.vy * drag + (f.g || 0) * dt;
           f.x += f.vx * dt; f.y += f.vy * dt;
         }
+        if (f.k === 'corpse') this.corpseStep(f, dt);
+        if (f.life <= 0 && f.end) f.end(f);
       }
       this.fx = this.fx.filter(f => f.life > 0);
       for (const u of this.popups) { u.y -= 30 * dt; u.life -= dt; }
@@ -534,6 +569,90 @@
     }
     // Bright white pop
     flash(x, y, r = 24) { this.fx.push({ k: 'flash', x, y, r, life: 0.2, max: 0.2 }); }
+    // Play custom art once at a spot (explosion, hit, a death animation); false if there's none
+    playArt(name, x, y, o = {}) {
+      const life = V.art.duration(name);
+      if (!life) return false;
+      this.fx.push({ k: 'art', name, x, y, o, life, max: life });
+      return true;
+    }
+    // Bullet impact: your 'hit' animation, or a spark star with a tiny shock ring
+    hit(x, y, color = '#ffffff', s = 1) {
+      if (this.playArt('hit', x, y, { h: 26 * s })) return;
+      this.flash(x, y, 9 * s);
+      this.ring(x, y, color, 15 * s, 0.18, 2);
+      for (let i = 0; i < 5; i++) {
+        const a = Math.random() * Math.PI * 2, life = V.rand(0.12, 0.2);
+        this.fx.push({ k: 'streak', x, y, vx: Math.cos(a) * V.rand(160, 300) * s, vy: Math.sin(a) * V.rand(160, 300) * s, drag: 8, color, life, max: life });
+      }
+    }
+    // Dark smoke that rises slowly and lingers
+    smoke(x, y, n = 5, spread = 30) {
+      for (let i = 0; i < n; i++) {
+        const life = V.rand(0.8, 1.4);
+        this.fx.push({ k: 'smoke', x: x + V.rand(-1, 1) * spread, y: y + V.rand(-1, 1) * spread * 0.6, vx: V.rand(-20, 20), vy: -V.rand(20, 55), drag: 1.2, size: V.rand(14, 26), life, max: life, delay: i * 0.03 });
+      }
+    }
+    // The alien bursting: flash, shock ring, glossy splash in its color, sparkles
+    pop(x, y, color, a = 14) {
+      this.flash(x, y, a * 1.7);
+      this.ring(x, y, '#ffffff', a * 2.6, 0.32, 4);
+      this.splash(x, y, color, 12, 230);
+      this.sparkle(x, y - 6, '#ffe58a', 4, a * 1.4);
+      this.burst(x, y, 10, color, 4, 200);
+    }
+    // Death animations. how: 'stomp' (flattened, then pops), 'dash' (sent flying), 'shot'
+    // (knocked back), 'blast'. Bats spiral down, saucers smoke and explode, maws wilt.
+    // Your '<enemy>_die' frames (alien_die, spiky_die, bat_die, ufo_die, maw_die) replace them.
+    kill(e, how, x, y) {
+      const color = e.color || (e.type === 'maw' ? '#e0233f' : e.type === 'bat' ? '#8a4dff' : '#f0ecff');
+      const artName = { walker: 'alien', spiky: 'spiky', bat: 'bat', saucer: 'ufo', maw: 'maw', jelly: 'jelly' }[e.type];
+      const dieArt = V.art.pick(artName + '_die', e.type === 'spiky' ? 'alien_die' : null, e.type === 'saucer' ? 'saucer_die' : null);
+      if (dieArt) {
+        this.playArt(dieArt, x, y, { h: e.a * (e.type === 'saucer' ? 2.2 : 2.6), flip: e.dir < 0 });
+        this.flash(x, y, e.a * 1.4);
+        this.splash(x, y, color, 8, 200);
+        return;
+      }
+      const snap = Object.assign({}, e, { dead: false, hurtT: 0, xeyes: true });
+      const f = { k: 'corpse', e: snap, how, x: snap.x, y: snap.y, spin: 0, vspin: 0, alpha: 1, color };
+      const dir = e.knock || (G_P() ? Math.sign(e.x - G_P().x) || 1 : 1);
+      if (e.type === 'bat') Object.assign(f, { vx: dir * 60, vy: -80, g: 700, vspin: 10 * dir, life: 0.7, max: 0.7, end: c => this.puff(c.x, c.y, 2, 1, 8) });
+      else if (e.type === 'saucer') Object.assign(f, { vx: e.vx * 0.3, vy: -40, g: 380, vspin: 0, life: 0.65, max: 0.65, end: c => this.blast(c.x, c.y, e.a) });
+      else if (e.type === 'maw') Object.assign(f, { life: 0.45, max: 0.45, end: c => this.pop(snap.hx, snap.hy, '#e0233f', e.a * 0.8) });
+      else if (how === 'stomp') Object.assign(f, { life: 0.15, max: 0.15, end: c => this.pop(c.x, c.y, color, e.a) });
+      else if (how === 'dash') Object.assign(f, { vx: dir * 300, vy: -280, g: 1100, vspin: 14 * dir, life: 0.4, max: 0.4, end: c => this.pop(c.x, c.y, color, e.a * 0.8) });
+      else Object.assign(f, { vx: dir * 170, vy: -140, g: 700, vspin: 9 * dir, life: 0.22, max: 0.22, end: c => this.pop(c.x, c.y, color, e.a) });
+      this.fx.push(f);
+      if (how !== 'stomp') this.flash(x, y, e.a * 1.2);
+    }
+    corpseStep(f, dt) {
+      const e = f.e, p = 1 - f.life / f.max;
+      f.spin += f.vspin * dt;
+      e.x = f.x; e.y = f.y;
+      if (e.type === 'walker' || e.type === 'spiky') {
+        if (f.how === 'stomp') { e.sx = 1 + 0.55 * p; e.sy = 1 - 0.62 * p; } // flattened under your feet
+        else { e.sx = 1 + 0.15 * Math.sin(p * 20); e.sy = 1 - 0.15 * Math.sin(p * 20); }
+      } else if (e.type === 'saucer') {
+        e.spin = Math.sin(p * 30) * 0.25 + p * 0.5;
+        if (Math.random() < 0.5) this.smoke(f.x, f.y, 1, 6);
+        if (Math.random() < 0.4) this.burst(f.x, f.y, 1, '#ffd86b', 3, 120);
+      } else if (e.type === 'maw') {
+        e.droop = p * 1.3; e.open = Math.max(0, (e.open || 0) - dt * 4);
+        f.alpha = 1 - p * 0.6;
+      } else if (e.type === 'bat') f.alpha = 1 - p * 0.8;
+    }
+    // A UFO going down: fireball, rings, debris and smoke
+    blast(x, y, a = 16) {
+      this.flash(x, y, a * 3);
+      this.ring(x, y, '#ffd86b', a * 4, 0.45, 5);
+      this.ring(x, y, '#5fe3ff', a * 2.6, 0.35, 3);
+      this.splash(x, y, '#d8d2ff', 10, 320);
+      this.splash(x, y, '#ffd86b', 8, 260);
+      this.smoke(x, y, 6, a * 1.2);
+      if (V.G) V.G.shake = Math.max(V.G.shake, 10);
+      if (V.sfx) V.sfx.boom();
+    }
     burst(x, y, n, color, size, speed, g = 0, life = 0.6) {
       for (let i = 0; i < n; i++) {
         const ang = Math.random() * 6.283, sp = speed * V.rand(0.3, 1);
@@ -557,7 +676,7 @@
       if (V.settings.depth) {
         const cx = (box.x0 + box.x1) / 2, cy = (box.y0 + box.y1) / 2;
         for (const p of this.plats) {
-          if (p.fallen || !vis(p.x + p.w / 2, p.y + p.depth / 2, p.w + 40)) continue;
+          if (p.fallen || !vis(p.x + p.w / 2, p.y + p.depth / 2, p.w + 40) || platformArt(p)) continue;
           const dx = V.clamp((cx - p.x - p.w / 2) * 0.03, -11, 11), dy = V.clamp((cy - p.y) * 0.045, -11, 11);
           const n = Math.min(3, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 3)); // ≤ 3 copies: cheap on phones
           const back = slab(p.spr), ox = p.crumbleT > 0 ? Math.sin(t * 70) * (1 + (1 - p.crumbleT / 0.9) * 3) : 0;
@@ -573,7 +692,9 @@
           V.drawGlow(ctx, p.x + 14, p.y + p.depth * 0.45, 20, '#5fe3ff', 0.6 + 0.3 * Math.sin(t * 20));
           V.drawGlow(ctx, p.x + p.w - 14, p.y + p.depth * 0.45, 20, '#5fe3ff', 0.6 + 0.3 * Math.sin(t * 20 + 1));
         }
-        ctx.drawImage(p.spr.canvas, p.x - p.spr.ox + ox, p.y - p.spr.oy + oy, p.spr.sw, p.spr.sh);
+        const custom = platformArt(p);
+        if (custom) drawPlatformArt(ctx, p, custom, p.x + ox, p.y + oy, t);
+        else ctx.drawImage(p.spr.canvas, p.x - p.spr.ox + ox, p.y - p.spr.oy + oy, p.spr.sw, p.spr.sh);
         if (p.cracks) {
           ctx.strokeStyle = 'rgba(20,5,30,0.85)'; ctx.lineWidth = 2;
           for (const line of p.cracks) {
@@ -608,11 +729,7 @@
       for (const e of this.enemies) {
         if (e.dead || !vis(e.x, e.y, 60)) continue;
         if (e.hurtT > 0 && Math.floor(t * 30) % 2) continue;
-        if (e.type === 'walker' || e.type === 'spiky') V.drawWalker(ctx, e, t, false, P);
-        else if (e.type === 'maw') V.drawMaw(ctx, e, t, e.bite > 0.5);
-        else if (e.type === 'jelly') V.drawFlyer(ctx, e, t, false);
-        else if (e.type === 'bat') V.drawBat(ctx, e, t);
-        else if (e.type === 'saucer') V.drawSaucer(ctx, e, t, false);
+        V.drawEnemy(ctx, e, t, P);
       }
       for (const b of this.bullets) if (vis(b.x, b.y, 20)) V.drawBullet(ctx, b);
       // Secret clouds clear up as you get close
@@ -630,9 +747,9 @@
         ctx.drawImage(V.gloss.dot(p.color), p.x - s / 2, p.y - s / 2, s, s);
       }
       ctx.globalAlpha = 1;
-      this.drawFx(ctx);
+      this.drawFx(ctx, t, P);
     }
-    drawFx(ctx) {
+    drawFx(ctx, t, P) {
       for (const f of this.fx) {
         if (f.delay > 0) continue;
         const k = V.clamp(f.life / f.max, 0, 1), p = 1 - k; // k: life left, p: progress
@@ -659,6 +776,23 @@
         } else if (f.k === 'flash') {
           ctx.globalAlpha = 1;
           V.drawGlow(ctx, f.x, f.y, f.r * (1 + p * 0.9), '#ffffff', k);
+        } else if (f.k === 'streak') {
+          ctx.globalAlpha = k;
+          ctx.strokeStyle = f.color; ctx.lineWidth = 2.2 * k + 0.6; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x - f.vx * 0.035, f.y - f.vy * 0.035); ctx.stroke();
+        } else if (f.k === 'smoke') {
+          const s = f.size * (0.6 + p * 1.1);
+          ctx.globalAlpha = 0.6 * k * Math.min(1, p * 6);
+          ctx.drawImage(V.gloss.smoke(), f.x - s, f.y - s, s * 2, s * 2);
+        } else if (f.k === 'art') {
+          ctx.globalAlpha = 1;
+          V.art.draw(ctx, f.name, f.x, f.y, Object.assign({ age: f.max - f.life }, f.o));
+        } else if (f.k === 'corpse') {
+          ctx.globalAlpha = f.alpha;
+          ctx.save();
+          ctx.translate(f.x, f.y); ctx.rotate(f.spin); ctx.translate(-f.x, -f.y);
+          V.drawEnemy(ctx, f.e, t, P);
+          ctx.restore();
         }
       }
       ctx.globalAlpha = 1;

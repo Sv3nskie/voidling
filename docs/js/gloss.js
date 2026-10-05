@@ -141,6 +141,14 @@
       g.fillRect(0, 0, 64, 64);
     }),
 
+    // Dark violet smoke puff (64 px)
+    smoke: () => make('smoke', 64, 64, g => {
+      const d = g.createRadialGradient(28, 26, 2, 32, 32, 31);
+      d.addColorStop(0, 'rgba(90,60,120,0.9)'); d.addColorStop(0.6, 'rgba(50,28,80,0.55)'); d.addColorStop(1, 'rgba(30,14,50,0)');
+      g.fillStyle = d;
+      g.fillRect(0, 0, 64, 64);
+    }),
+
     // Four-point twinkle (64 px)
     star: color => make(`star${color}`, 64, 64, g => {
       color = hex6(color);

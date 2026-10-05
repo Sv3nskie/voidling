@@ -12,6 +12,11 @@
       // A spinning gold coin: the face narrows as it turns and its thick edge shows beside it
       V.drawGlow(ctx, x, y, a * 2.2, '#ffcc4d', 0.3);
       const ang = t * 3 + f.phase, c = Math.cos(ang), fw = Math.max(0.1, Math.abs(c));
+      if (V.art.has('coin')) { // your coin: its own frames spin it, a single image gets turned
+        const one = V.art.frames('coin') === 1;
+        V.art.draw(ctx, 'coin', x, y, { h: a * 2.1, t: t + f.phase, sx: one ? fw : 1 });
+        return;
+      }
       ctx.fillStyle = '#9a5a12';
       ctx.beginPath(); ctx.ellipse(x + Math.sin(ang) * a * 0.17, y, Math.max(a * fw, a * 0.16), a * 0.98, 0, 0, TAU); ctx.fill();
       ctx.save();
@@ -75,7 +80,13 @@
     ctx.save();
     ctx.translate(x, y + a * 0.85 - hop * a * 0.14);
     ctx.scale(e.dir, 1);
-    ctx.scale(1 + sq, 1 - sq);
+    ctx.scale((1 + sq) * (e.sx || 1), (1 - sq) * (e.sy || 1));
+    const art = e.spikes ? V.art.pick('spiky_walk', 'spiky', 'alien_walk', 'alien') : V.art.pick('alien_walk', 'alien');
+    if (art) {
+      V.art.draw(ctx, art, 0, 0, { h: a * 2.4, anchor: 'bottom', t: t + e.phase });
+      ctx.restore();
+      return;
+    }
     ctx.translate(0, -a * 0.85);
     ctx.strokeStyle = V.mixHex(e.color, '#1a0830', 0.25); ctx.lineWidth = a * 0.12; ctx.lineCap = 'round';
     const sway = Math.sin(t * 6 + e.phase) * a * 0.08;
@@ -110,7 +121,11 @@
     const eyes = e.eyes, blink = Math.sin(t * 1.1 + e.phase * 3) > 0.97 ? 0.15 : 1;
     for (let i = 0; i < eyes; i++) {
       const ex = (i - (eyes - 1) / 2) * a * 0.42 + a * 0.15, er = a * (eyes === 1 ? 0.34 : 0.22);
-      eye(ctx, ex, -a * 0.15, er, er * blink, lx, ly, danger ? '#c4002f' : '#3a1a7a');
+      if (e.xeyes) { // knocked out
+        ctx.strokeStyle = '#1a0b33'; ctx.lineWidth = er * 0.45; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(ex - er * 0.6, -a * 0.15 - er * 0.6); ctx.lineTo(ex + er * 0.6, -a * 0.15 + er * 0.6);
+        ctx.moveTo(ex + er * 0.6, -a * 0.15 - er * 0.6); ctx.lineTo(ex - er * 0.6, -a * 0.15 + er * 0.6); ctx.stroke();
+      } else eye(ctx, ex, -a * 0.15, er, er * blink, lx, ly, danger ? '#c4002f' : '#3a1a7a');
     }
     ctx.fillStyle = '#2a0b2a';
     ctx.beginPath(); ctx.ellipse(a * 0.2, a * 0.36, a * 0.25, danger ? a * 0.16 : a * 0.08, 0, 0, TAU); ctx.fill();
@@ -123,6 +138,8 @@
     const { x, y, a } = e;
     if (danger) dangerAura(ctx, x, y, a, t);
     V.drawGlow(ctx, x, y, a * 2.2, e.glow, 0.45);
+    const sq = e.squish > 0 ? e.squish * 0.3 : 0;
+    if (V.art.draw(ctx, 'jelly', x, y + a * 0.3, { h: a * 2.6, t: t + e.phase, sx: 1 + sq, sy: 1 - sq })) return;
     ctx.save();
     ctx.translate(x, y);
     ctx.strokeStyle = e.color; ctx.lineWidth = a * 0.1; ctx.lineCap = 'round';
@@ -155,10 +172,15 @@
     ctx.fillStyle = '#3fa060';
     ctx.beginPath(); ctx.ellipse(x - a * 0.5, baseY - a * 0.3, a * 0.5, a * 0.18, -0.5, 0, TAU); ctx.fill();
     if (danger) dangerAura(ctx, hx, hy, a, t);
+    const open = e.open;
+    if (V.art.has('maw')) { // frames go from closed to wide open
+      const n = V.art.frames('maw');
+      V.art.draw(ctx, 'maw', hx, hy, { h: a * 2.4, rot: e.lean * 0.4 + (e.droop || 0), frame: Math.round(V.clamp(open, 0, 1) * (n - 1)) });
+      return;
+    }
     ctx.save();
     ctx.translate(hx, hy);
-    ctx.rotate(e.lean * 0.4);
-    const open = e.open;
+    ctx.rotate(e.lean * 0.4 + (e.droop || 0));
     for (const s of [-1, 1]) { // two jaws
       ctx.save();
       ctx.rotate(s * open * 0.55);
@@ -190,9 +212,11 @@
     // Charging a shot: a pulsing red glow underneath, so you can see it coming
     if (e.charging) V.drawGlow(ctx, x, y + a * 0.5, a * 2.4, '#ff2050', 0.55 + 0.4 * Math.sin(t * 22));
     V.drawGlow(ctx, x, y + a * 0.6, a * 2, e.charging ? '#ff4f7a' : '#5fe3ff', 0.5);
+    const tilt = V.clamp(e.vx / (a * 20), -0.3, 0.3) + (e.spin || 0);
+    if (V.art.draw(ctx, V.art.pick('ufo', 'saucer'), x, y, { w: a * 2.8, rot: tilt, t })) return;
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(V.clamp(e.vx / (a * 20), -0.3, 0.3));
+    ctx.rotate(tilt);
     // Glass dome with a little pilot inside, and a reflection across the glass
     const dome = ctx.createRadialGradient(-a * 0.2, -a * 0.6, a * 0.05, 0, -a * 0.25, a * 0.6);
     dome.addColorStop(0, 'rgba(230,255,255,0.85)'); dome.addColorStop(1, 'rgba(110,200,240,0.5)');
@@ -219,10 +243,20 @@
     ctx.restore();
   };
 
+  // UFO shot: a hot glossy orb with a short fading tail
   V.drawBullet = (ctx, b) => {
     V.drawGlow(ctx, b.x, b.y, b.a * 3, '#ff4f7a', 0.9);
-    ctx.fillStyle = '#ffe0ea';
-    circle(ctx, b.x, b.y, b.a * 0.6); ctx.fill();
+    if (V.art.draw(ctx, 'bullet_enemy', b.x, b.y, { h: b.a * 3, rot: Math.atan2(b.vy, b.vx), t: V.G ? V.G.t : 0 })) return;
+    const sp = Math.hypot(b.vx, b.vy) || 1;
+    for (let i = 1; i <= 4; i++) {
+      const s = b.a * (1 - i * 0.18);
+      ctx.globalAlpha = 0.5 - i * 0.1;
+      ctx.drawImage(V.gloss.dot('#ff4f7a'), b.x - b.vx / sp * i * b.a * 0.9 - s, b.y - b.vy / sp * i * b.a * 0.9 - s, s * 2, s * 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.drawImage(V.gloss.dot('#ff8aa8'), b.x - b.a, b.y - b.a, b.a * 2, b.a * 2);
+    ctx.fillStyle = '#ffffff';
+    circle(ctx, b.x, b.y, b.a * 0.35); ctx.fill();
   };
 
   // Hostile flyer: a little void bat that swoops at you
@@ -230,8 +264,10 @@
     const { x, y, a } = e;
     const flap = Math.sin(t * 14 + e.phase);
     V.drawGlow(ctx, x, y, a * 2, '#ff2050', e.swoopT > 0 ? 0.55 : 0.25);
+    if (V.art.draw(ctx, 'bat', x, y, { h: a * 2.2, t: t + e.phase, rot: e.spin || 0, flip: e.vx < 0 })) return;
     ctx.save();
     ctx.translate(x, y);
+    if (e.spin) ctx.rotate(e.spin);
     ctx.fillStyle = '#4a1a6e';
     for (const s of [-1, 1]) {
       ctx.beginPath();
@@ -257,12 +293,17 @@
   V.drawHeart = (ctx, x, y, s, alpha = 1) => {
     const prev = ctx.globalAlpha, k = s / 48;
     ctx.globalAlpha = prev * alpha;
-    ctx.drawImage(V.gloss.heart(), x - 64 * k, y - 70 * k, 128 * k, 128 * k);
+    if (!V.art.draw(ctx, 'heart', x, y, { h: s * 2.1, t: V.G ? V.G.t : 0 })) ctx.drawImage(V.gloss.heart(), x - 64 * k, y - 70 * k, 128 * k, 128 * k);
     ctx.globalAlpha = prev;
   };
 
   // Diamond: a revive. Brilliant-cut gem with a twinkle; empty = outline for HUD slots.
   V.drawDiamond = (ctx, x, y, s, t, empty = false) => {
+    if (V.art.has('diamond')) {
+      if (!empty) V.drawGlow(ctx, x, y, s * 3, '#9ff3ff', 0.5 + 0.2 * Math.sin(t * 4));
+      V.art.draw(ctx, 'diamond', x, y, { h: s * 2.1, t, alpha: empty ? 0.22 : 1 });
+      return;
+    }
     ctx.save();
     ctx.translate(x, y);
     const outline = () => {
@@ -314,6 +355,7 @@
     } else {
       V.drawGlow(ctx, x, y - 34, 34, '#b98cff', 0.35 + 0.2 * Math.sin(t * 4));
     }
+    if (V.art.draw(ctx, V.art.pick(lit ? 'beacon_lit' : 'beacon', 'beacon'), x, y, { h: 70, anchor: 'bottom', t })) return;
     ctx.fillStyle = '#2a1a40';
     ctx.beginPath(); ctx.moveTo(x - 14, y); ctx.lineTo(x - 9, y - 14); ctx.lineTo(x + 9, y - 14); ctx.lineTo(x + 14, y); ctx.closePath(); ctx.fill();
     const g = ctx.createLinearGradient(x - 10, y - 60, x + 10, y - 14);
@@ -342,6 +384,12 @@
     const n = Math.max(1, Math.floor((x1 - x0) / 9));
     const w = (x1 - x0) / n;
     V.drawGlow(ctx, (x0 + x1) / 2, y - 4, (x1 - x0) * 0.6, '#ff2050', 0.25 + 0.1 * Math.sin(t * 5));
+    const f = V.art.frame('spikes', { t });
+    if (f) { // your spike image, repeated along the strip
+      const h = 15 * V.art.opt('spikes', 'scale', 1), tw = h * f.sw / f.sh, k = Math.max(1, Math.round((x1 - x0) / tw)), sw = (x1 - x0) / k;
+      for (let i = 0; i < k; i++) ctx.drawImage(f.img, f.sx, f.sy, f.sw, f.sh, x0 + i * sw, y + 1 - h, sw, h);
+      return;
+    }
     for (let i = 0; i < n; i++) {
       const sx = x0 + i * w, h = 11 + (i % 2) * 3;
       ctx.fillStyle = '#c41e4a';
@@ -423,16 +471,64 @@
   };
   V.drawEye = eye;
 
+  V.drawEnemy = (ctx, e, t, P) => {
+    if (e.type === 'walker' || e.type === 'spiky') V.drawWalker(ctx, e, t, false, P);
+    else if (e.type === 'maw') V.drawMaw(ctx, e, t, e.bite > 0.5);
+    else if (e.type === 'jelly') V.drawFlyer(ctx, e, t, false);
+    else if (e.type === 'bat') V.drawBat(ctx, e, t);
+    else if (e.type === 'saucer') V.drawSaucer(ctx, e, t, false);
+  };
+
+  // The Voidling's death: it swells, flashes white with X eyes, then shatters (game-ui spawns
+  // the shards). Your 'player_die' frames replace it.
+  V.drawPlayerDeath = (ctx, d, r, t) => {
+    if (V.art.draw(ctx, 'player_die', d.x, d.y + r, { h: r * 2.7, anchor: 'bottom', flip: d.face < 0, age: d.t })) return;
+    if (d.t > 0.2) return;
+    const k = d.t / 0.2, s = 1 + 0.3 * Math.sin(k * Math.PI * 0.5);
+    ctx.save();
+    ctx.translate(d.x, d.y);
+    ctx.rotate(Math.sin(d.t * 60) * 0.08 * k);
+    ctx.scale(s, s);
+    V.gloss.draw(ctx, V.gloss.voidBody(), 0, 0, r, 60);
+    V.drawGlow(ctx, 0, 0, r * 1.6, '#ffffff', k * 0.9);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = r * 0.12; ctx.lineCap = 'round';
+    for (const sx of [-1, 1]) {
+      const ex = d.face * r * 0.22 + sx * r * 0.3, ey = -r * 0.2, q = r * 0.13;
+      ctx.beginPath(); ctx.moveTo(ex - q, ey - q); ctx.lineTo(ex + q, ey + q); ctx.moveTo(ex + q, ey - q); ctx.lineTo(ex - q, ey + q); ctx.stroke();
+    }
+    ctx.restore();
+  };
+
+  // Custom player art for what the Voidling is doing, with fallbacks (assets/README.md)
+  const PLAYER_STATES = {
+    hurt: ['hurt', 'fall'], dash: ['dash', 'run'], shoot: ['shoot'], glide: ['glide', 'fall', 'jump'],
+    jump: ['jump', 'fall'], fall: ['fall', 'jump'], run: ['run'], idle: ['idle'],
+  };
+  const playerArt = (P, t) => {
+    if (!V.art.count) return null;
+    const st = P.inv > 1 ? 'hurt' : P.dashT > 0 ? 'dash' : t - (P.shotAt || -9) < 0.15 ? 'shoot'
+      : !P.onGround ? (P.gliding ? 'glide' : P.vy < 0 ? 'jump' : 'fall') : Math.abs(P.vx) > 25 ? 'run' : 'idle';
+    return V.art.pick(...PLAYER_STATES[st].map(s => 'player_' + s), 'player_idle', 'player');
+  };
+
   V.drawPlayer = (ctx, P, t) => {
     const r = P.r;
     if (P.inv > 0 && Math.floor(t * 20) % 2 === 0) return;
-    V.drawGlow(ctx, P.x, P.y, r * 2.5, '#8a4dff', 0.5);
+    const spawn = V.clamp(P.spawnT === undefined ? 1 : 1 - P.spawnT / 0.4, 0, 1); // reforming after a revive
+    const grow = spawn < 1 ? 0.2 + 0.8 * (1 + 2.2 * Math.pow(spawn - 1, 3) + 1.2 * Math.pow(spawn - 1, 2)) : 1;
+    const art = playerArt(P, t);
+    if (!art || V.art.opt(art, 'glow', true)) V.drawGlow(ctx, P.x, P.y, r * 2.5, '#8a4dff', 0.5);
     ctx.save();
     // Anchored at the feet: squash flattens onto the ground, speed stretches, running leans in
     ctx.translate(P.x, P.y + r);
     const sq = P.squash, st = P.onGround ? 0 : V.clamp(-P.vy / 1500, -0.1, 0.16);
     ctx.rotate(V.clamp(P.vx / 175, -1, 1) * 0.1);
-    ctx.scale(1 + sq - st * 0.55, 1 - sq + st);
+    ctx.scale((1 + sq - st * 0.55) * grow, (1 - sq + st) * grow);
+    if (art) {
+      V.art.draw(ctx, art, 0, 0, { h: r * 2.7, anchor: 'bottom', flip: P.face < 0, t });
+      ctx.restore();
+      return;
+    }
     ctx.translate(0, -r);
     V.gloss.draw(ctx, V.gloss.voidBody(), 0, 0, r, 60);
     // Stars twinkling inside the void

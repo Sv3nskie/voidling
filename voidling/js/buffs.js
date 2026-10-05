@@ -145,6 +145,7 @@
 
   // ---------- Drawing ----------
   function icon(ctx, type, s, t) {
+    if (V.art.draw(ctx, 'buff_' + type.toLowerCase(), 0, 0, { h: s * 1.7, t })) return; // your power-up art
     ctx.lineWidth = s * 0.16; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.strokeStyle = BUFFS[type].color; ctx.fillStyle = BUFFS[type].color;
     ctx.beginPath();
@@ -175,8 +176,10 @@
     V.drawGlow(ctx, x, y, 46, b.color, 0.5 + 0.2 * Math.sin(t * 4));
     ctx.save();
     ctx.translate(x, y);
-    ctx.fillStyle = 'rgba(11,5,24,0.8)';
-    ctx.beginPath(); ctx.arc(0, 0, s, 0, TAU); ctx.fill();
+    if (!V.art.has('buff_' + it.type.toLowerCase())) {
+      ctx.fillStyle = 'rgba(11,5,24,0.8)';
+      ctx.beginPath(); ctx.arc(0, 0, s, 0, TAU); ctx.fill();
+    }
     icon(ctx, it.type, s, t);
     const pulse = 1 + Math.sin(t * 3 + it.phase) * 0.04;
     V.gloss.draw(ctx, V.gloss.bubble(b.color), 0, 0, (s + 5) * pulse, 56); // glass orb around the power-up
