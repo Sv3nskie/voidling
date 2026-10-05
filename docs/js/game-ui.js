@@ -15,10 +15,20 @@
 
   G.die = reason => {
     const P = G.P;
-    G.state = 'dead'; G.overT = 0; G.shake = 18;
     document.body.classList.remove('playing');
     G.tower.burst(P.x, P.y, 50, '#8a4dff', 5, 300, 0, 1.2);
+    G.shake = 18;
     V.sfx.boom();
+    // A diamond saves you automatically: short revive moment, then back to the last checkpoint
+    if (P.diamonds > 0) {
+      P.diamonds--;
+      G.state = 'reviving'; G.overT = 0; G.paused = false;
+      G.revive = { reason, t: 0, to: G.checkpoint ? G.meters(G.checkpoint.y) : 0, left: P.diamonds };
+      G.tower.burst(P.x, P.y, 30, '#bff6ff', 4, 260, 0, 1.2);
+      setTimeout(() => V.sfx.tier(), 350);
+      return;
+    }
+    G.state = 'dead'; G.overT = 0;
     const isBest = P.best > G.best;
     if (isBest) { G.best = P.best; try { localStorage.setItem('voidling.climb.best', String(G.best)); } catch (e) { /* storage blocked */ } }
     setTimeout(() => {
@@ -30,14 +40,41 @@
       $('oKills').textContent = P.kills;
       $('oCoins').textContent = P.coins;
       $('oTime').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-      $('bestOver').textContent = isBest ? 'New best height!' : `Best: ${G.best} m`;
-      const canCont = !!G.checkpoint && G.continues > 0;
-      $('contBtn').hidden = !canCont;
-      if (canCont) $('contBtn').textContent = `Continue from ${G.meters(G.checkpoint.y)} m (${G.continues} left)`;
+      $('bestOver').textContent = (isBest ? 'New best height!' : `Best: ${G.best} m`) + '  ·  Tip: diamonds bring you back to your last checkpoint';
       $('over').hidden = false;
-      (canCont ? $('contBtn') : $('againBtn')).focus();
+      $('againBtn').focus();
     }, 900);
   };
+
+  // The revive moment: "DIAMOND USED", the diamonds you have left, and where you go back to
+  function drawRevive() {
+    const r = G.revive, W = G.HW, H = G.HH, t = G.t;
+    const a = V.clamp(r.t * 3, 0, 1);
+    ctx.fillStyle = `rgba(11,5,24,${0.55 * a})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffd6e0'; ctx.font = `22px ${FONT_D}`;
+    ctx.fillText(r.reason, W / 2, H * 0.3);
+    // The used diamond shatters in the middle, the ones left stay lit
+    const used = V.clamp(r.t / 0.6, 0, 1);
+    if (used < 1) V.drawDiamond(ctx, W / 2, H * 0.43, 34 * (1 + used * 0.4), t);
+    else for (let i = 0; i < 6; i++) {
+      const ang = i * Math.PI / 3 + 0.4, d = 30 + (r.t - 0.6) * 160;
+      ctx.fillStyle = `rgba(191,246,255,${Math.max(0, 1 - (r.t - 0.6))})`;
+      ctx.fillRect(W / 2 + Math.cos(ang) * d - 4, H * 0.43 + Math.sin(ang) * d - 4, 8, 8);
+    }
+    ctx.shadowColor = '#5fe3ff'; ctx.shadowBlur = 20;
+    ctx.fillStyle = '#bff6ff'; ctx.font = `${Math.min(46, W / 14)}px ${FONT_D}`;
+    ctx.fillText('DIAMOND USED', W / 2, H * 0.56);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#f4eaff'; ctx.font = `600 20px ${FONT_B}`;
+    ctx.fillText(r.to > 0 ? `Back to your checkpoint at ${r.to} m` : 'Back to the bottom (no checkpoint yet)', W / 2, H * 0.63);
+    for (let i = 0; i < 3; i++) V.drawDiamond(ctx, W / 2 + (i - 1) * 40, H * 0.72, 12, t, i >= r.left);
+    ctx.fillStyle = '#b9a6d9'; ctx.font = `500 15px ${FONT_B}`;
+    ctx.fillText(r.left ? `${r.left} diamond${r.left > 1 ? 's' : ''} left` : 'No diamonds left. Next time it counts.', W / 2, H * 0.78);
+    ctx.globalAlpha = 1;
+  }
 
   // Critically damped spring (like Unity's SmoothDamp): eases in and out, never jerks
   function smooth(cur, target, vel, time, dt) {
@@ -130,6 +167,7 @@
     ctx.fillText(`${G.meters(P.y)} m`, pad, pad + 14);
     ctx.shadowBlur = 0;
     for (let i = 0; i < P.maxHearts; i++) V.drawHeart(ctx, pad + 11 + i * 26, pad + 70, 10, i < P.hearts ? 1 : 0.18);
+    for (let i = 0; i < 3; i++) V.drawDiamond(ctx, pad + 11 + i * 26, pad + 95, 9, t, i >= P.diamonds); // revives
     G.drawHeldHud(ctx);
     G.drawBuffHud(ctx);
 
@@ -198,7 +236,7 @@
     const s = G.story.cur, W = G.HW;
     if (!s || s.delay > 0) return;
     const bw = Math.min(520, W - 32), x = (W - bw) / 2;
-    const y = Math.max(G.guide.panelBottom + 10, x < 270 ? (G.hudLeftBottom || 104) + 6 : 0);
+    const y = Math.max(G.guide.panelBottom + 10, x < 270 ? (G.hudLeftBottom || 130) + 6 : 0);
     ctx.font = `500 16px ${FONT_B}`;
     const lines = wrapLines(s.text, bw - 36);
     const h = 46 + lines.length * 21;
@@ -238,7 +276,7 @@
     }
     ctx.globalAlpha = 1;
     G.drawBuffFx(ctx);
-    if (G.state !== 'dead') { V.drawPlayer(ctx, P, t); G.drawHeld(ctx); }
+    if (G.state !== 'dead' && G.state !== 'reviving') { V.drawPlayer(ctx, P, t); G.drawHeld(ctx); }
     V.drawVoid(ctx, G.voidY, box.x0, box.x1, box.y1, t, P.buffs.freeze > 0, G.surge.k);
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -275,9 +313,10 @@
     const tb = G.touchBox; // centered HUD only needs to dodge the buttons when they leave no room between them
     G.reserve = tb ? (tb.gap > 330 ? 10 : tb.center) / G.ui : 0;
     G.reserveLeft = tb ? tb.left / G.ui : 0;
-    if (G.state === 'play') {
+    if (G.state === 'play' || G.state === 'reviving') {
       ctx.setTransform(dpr * G.ui, 0, 0, dpr * G.ui, 0, 0);
-      drawHud(); G.guide.draw(ctx); drawStory();
+      drawHud();
+      if (G.state === 'reviving') drawRevive(); else { G.guide.draw(ctx); drawStory(); }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     if (G.paused) {
@@ -303,6 +342,7 @@
       G.tower.generate(G.cam.y - G.view().h * 1.5);
       G.tower.cull(G.voidY);
     }
+    if (G.state === 'reviving' && (G.revive.t += dt) > 2.4) cont(); // diamond revive: back to the checkpoint
     G.tower.update(dt, G.t, G.P);
     updateCamera(dt);
     G.shake = Math.max(0, G.shake - dt * 30);
@@ -312,6 +352,7 @@
     updateWind(dt);
     G.overT += dt;
   }
+  G.step = step; // lets tests drive the game loop frame by frame
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(0.033, (now - last) / 1000);
@@ -321,7 +362,7 @@
     if (I.hit('mute')) V.audio.toggleMute();
     if (G.state === 'play' && I.hit('pause')) G.paused = !G.paused;
     if (G.state === 'title' && I.hit('start')) start();
-    if (G.state === 'dead' && G.overT > 1.6 && I.hit('start')) (G.checkpoint && G.continues > 0 ? cont : start)();
+    if (G.state === 'dead' && G.overT > 1.6 && I.hit('start')) start();
     if (!G.paused) { G.t += dt; step(dt); }
     render();
     I.endFrame();
@@ -360,7 +401,6 @@
   G.canvas.addEventListener('pointerdown', () => { if (G.paused) G.paused = false; });
   $('playBtn').addEventListener('click', start);
   $('againBtn').addEventListener('click', start);
-  $('contBtn').addEventListener('click', cont);
   document.querySelectorAll('#touch button').forEach(b => {
     const act = b.dataset.act;
     const on = e => { e.preventDefault(); V.audio.init(); V.input.press(act); };

@@ -113,7 +113,6 @@ body {
 .dot.edible { border: 2px dashed var(--crystal); }
 .dot.hunger { background: linear-gradient(90deg, #8a4dff, #ff7fc8); }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
-#contBtn:not([hidden]) + #againBtn { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--glow); }
 @media (max-height: 640px) { .rules { font-size: 0.9rem; gap: 4px; } .card { gap: 10px; } }
 
 #touch { position: fixed; inset: auto 0 0 0; display: none; justify-content: space-between; padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 4; pointer-events: none; }
@@ -164,7 +163,7 @@ body.touch.playing #pauseBtn { display: grid; }
       <li><span class="dot gun"></span><span><b>Pick up rocks, bombs and guns.</b> Aim with the mouse and click to throw or shoot.</span></li>
       <li><span class="dot power"></span><span><b>Find hidden power-ups:</b> shield, super jump, wings, grapple hook and more.</span></li>
       <li><span class="dot danger"></span><span><b>Spiky aliens and red spikes</b> hurt. You have 3 hearts.</span></li>
-      <li><span class="dot hunger"></span><span><b>Light the beacons</b> for a heart and a checkpoint. Don't let the Void catch you.</span></li>
+      <li><span class="dot hunger"></span><span><b>Beacons are checkpoints.</b> Collect <b>diamonds</b>: when you die, one brings you back to your last checkpoint (hold up to 3).</span></li>
     </ol>
     <button class="play" id="playBtn" type="button">Play</button>
     <ul class="keys">
@@ -195,7 +194,6 @@ body.touch.playing #pauseBtn { display: grid; }
       <div class="stat"><span>Time</span><strong id="oTime">0:00</strong></div>
     </div>
     <div class="actions">
-      <button class="play" id="contBtn" type="button" hidden>Continue</button>
       <button class="play" id="againBtn" type="button">Restart from the bottom</button>
     </div>
     <p class="best" id="bestOver"></p>

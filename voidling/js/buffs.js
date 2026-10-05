@@ -212,7 +212,7 @@
     if (P.buffs.wings > 0) rows.push(['wings', `WINGS ${Math.ceil(P.buffs.wings)}s`]);
     if (P.buffs.freeze > 0) rows.push(['freeze', `VOID FROZEN ${Math.ceil(P.buffs.freeze)}s`]);
     if (P.hooks > 0) rows.push(['hook', G.isTouch() ? `HOOK ×${P.hooks}` : `HOOK ×${P.hooks}  ·  G / right-click`]);
-    let y = 104;
+    let y = 130; // below the hearts and diamond slots
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     for (const [type, text] of rows) {
       ctx.font = `11px ${FONT_D}`;

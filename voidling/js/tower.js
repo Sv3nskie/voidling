@@ -52,6 +52,7 @@
       this.rng = V.rng(TOWER_SEED + zone * 7777);
       this.seed = 1 + zone * 1000;
       this.bag = [];
+      this.diamondDue = null; // height (m) of the next diamond in this zone
       if (this.building) V.random = this.rng;
     }
     seeded(fn) {
@@ -76,7 +77,7 @@
       this.ppu = ppu;
       this.reseed(cp.zone);
       const p = this.seeded(() => this.addPlat(cp.x - 85, cp.y, 170, 'solid', { beacon: true, zone: cp.zone, depth: BEACON_DEPTH }));
-      p.lit = true;
+      p.lit = true; p.touched = true;
       this.last = { cx: cp.x, y: cp.y, w: 170 };
       this.genY = cp.y;
       this.zoneMade = cp.zone;
@@ -131,7 +132,7 @@
       return e;
     }
     addItem(type, x, y) {
-      const a = { heart: 9, coin: 6, rock: 9, bomb: 10 }[type] ?? 14;
+      const a = { heart: 9, coin: 6, rock: 9, bomb: 10, diamond: 12 }[type] ?? 14;
       this.items.push({ type, x, y, a, phase: V.random() * 6.28 });
     }
     coinArc(x0, y0, x1, y1) {
@@ -210,6 +211,10 @@
       this.decorate(p, z, false);
       if (++this.rows === 9) this.addItem('blaster', cx, y - 30); // first gun comes early
       else if (this.rows > 4 && V.chance(0.2)) this.secret(cx, w, y, zi);
+      // Diamonds: about one every 70-110 m, always in a hard-to-reach spot
+      const m = -y / M;
+      if (this.diamondDue === null) this.diamondDue = m + V.rand(30, 55);
+      if (m >= this.diamondDue) { this.diamond(p, cx, w, y, zi); this.diamondDue = m + V.rand(70, 110); }
       if (V.chance(0.35)) this.coinArc(prev.cx, prev.y, cx, y);
       // Optional side island for variety (never needed to progress); skipped if it would crowd
       if (!jelly && V.chance(0.45)) {
@@ -228,9 +233,9 @@
     }
     // A power-up in a hard-to-reach spot: a small ledge far off the main path, hidden in a
     // cloud (needs jump + double jump + air dash), or floating high above the platform.
-    secret(cx, w, y, zi) {
-      if (!this.bag.length) this.bag = V.buffBag(zi);
-      const buff = this.bag.pop(), lw = 58;
+    secret(cx, w, y, zi, item = null) {
+      if (!item && !this.bag.length) this.bag = V.buffBag(zi);
+      const buff = item || this.bag.pop(), lw = 58;
       const gap = V.rand(170, 215), ly = y - V.rand(20, 70);
       const right = cx + w / 2 + gap, left = cx - w / 2 - gap - lw;
       const options = [];
@@ -248,6 +253,14 @@
       } else {
         this.addItem(buff, V.clamp(cx + V.rand(-w / 2, w / 2), -HALF + 24, HALF - 24), y - V.rand(150, 178));
       }
+    }
+    // Where a diamond goes: right over a spike strip (grab it without landing on the spikes),
+    // high above the platform (needs a full double jump), or on a hidden ledge off to the side
+    diamond(p, cx, w, y, zi) {
+      const r = V.random();
+      if (p.spikes && r < 0.6) this.addItem('diamond', p.x + (p.spikes[0] + p.spikes[1]) / 2, p.y - 40);
+      else if (r < 0.55) this.addItem('diamond', V.clamp(cx + V.rand(-w / 2, w / 2), -HALF + 24, HALF - 24), y - V.rand(150, 175));
+      else this.secret(cx, w, y, zi, 'diamond');
     }
     decorate(p, z, branch) {
       const room = p.w >= 90 && p.type !== 'moving';
@@ -415,6 +428,8 @@
         if (it.type === 'heart') {
           V.drawGlow(ctx, it.x, it.y + bob, 26, '#ff4f7a', 0.5);
           V.drawHeart(ctx, it.x, it.y + bob, it.a);
+        } else if (it.type === 'diamond') {
+          V.drawDiamond(ctx, it.x, it.y + bob, 12, t);
         } else if (V.BUFFS[it.type]) {
           V.drawBuff(ctx, it, t);
         } else if (it.type !== 'coin') {

@@ -56,7 +56,9 @@
   const freshPlayer = (x, y) => ({
     x, y, vx: 0, vy: 0, r: R, onGround: true, plat: null, coyote: 0, jumpBuf: 0, jumps: 0, airDash: true,
     dashT: 0, dashCd: 0, face: 1, inv: 0, mouth: 0, squash: 0, lookX: 1, lookY: 0, gliding: false,
-    hearts: 3, maxHearts: 5, best: 0, coins: 0, kills: 0, time: 0, zone: 0, trail: [], held: null, fireCd: 0,
+    // best = highest point this run (the score); peak = highest point since the last respawn
+    // (what the Void measures against); diamonds = revives, max 3
+    hearts: 3, maxHearts: 5, best: 0, peak: 0, diamonds: 0, coins: 0, kills: 0, time: 0, zone: 0, trail: [], held: null, fireCd: 0,
     buffs: { shield: 0, boots: 0, wings: 0, freeze: 0 }, hooks: 0, hook: null, rescue: null,
   });
 
@@ -66,7 +68,7 @@
     G.tower.reset();
     G.tower.init(G.ppu());
     G.P = freshPlayer(0, -R);
-    Object.assign(G, { voidY: 320, voidDelay: 4, saucerT: 12, thunderT: 4, continues: 2, checkpoint: null, banner: null, shake: 0, freeze: 0, flash: 0 });
+    Object.assign(G, { voidY: 320, voidDelay: 4, saucerT: 12, thunderT: 4, checkpoint: null, banner: null, shake: 0, freeze: 0, flash: 0 });
     Object.assign(G, { surge: { phase: 'calm', t: 30, k: 0 }, lastBest: 0, stallT: 0, stallMul: 1 });
     Object.assign(G.wind, { phase: 'calm', t: 3, power: 0, streaks: [] });
     G.flags = {};
@@ -76,14 +78,20 @@
     G.tower.generate(G.cam.y - 1400);
     G.say('ANCIENT SIGNAL', 'The Void swallowed the world below. It is still hungry. Climb, little one.', '#ffd86b', 1.2);
   };
+  // A diamond brings you back to the last checkpoint (or the bottom if no beacon was reached
+  // yet) with full hearts, keeping this run's height, stats and remaining diamonds
   G.continueRun = () => {
     const cp = G.checkpoint, old = G.P;
-    G.tower.restartFrom(cp, G.ppu());
-    G.P = Object.assign(freshPlayer(cp.x, cp.y - R), { best: old.best, coins: old.coins, kills: old.kills, time: old.time, zone: cp.zone, inv: 2, maxHearts: old.maxHearts });
-    Object.assign(G, { voidY: cp.y + 500, voidDelay: 3, banner: null, shake: 0, freeze: 0, shots: [], blasts: [] });
-    Object.assign(G, { surge: { phase: 'calm', t: 18, k: 0 }, lastBest: old.best, stallT: 0, stallMul: 1 });
-    Object.assign(G.cam, { y: G.P.y - 100, vy: 0, focus: G.P.y });
-    G.continues--;
+    let x = 0, y = -R;
+    if (cp) { G.tower.restartFrom(cp, G.ppu()); x = cp.x; y = cp.y - R; }
+    else { G.tower.reset(); G.tower.init(G.ppu()); }
+    G.P = Object.assign(freshPlayer(x, y), {
+      best: old.best, peak: G.meters(y), diamonds: old.diamonds, coins: old.coins, kills: old.kills, time: old.time,
+      zone: cp ? cp.zone : 0, inv: 2, maxHearts: old.maxHearts, hearts: 3,
+    });
+    Object.assign(G, { voidY: y + 500, voidDelay: 3, banner: null, shake: 0, freeze: 0, shots: [], blasts: [] });
+    Object.assign(G, { surge: { phase: 'calm', t: 18, k: 0 }, lastBest: G.P.peak, stallT: 0, stallMul: 1 });
+    Object.assign(G.cam, { y: y - 100, vy: 0, focus: y });
     G.tower.generate(G.cam.y - 1400);
   };
 
@@ -151,7 +159,7 @@
         if (oldBottom <= p.y + 2 && P.y + r >= p.y) {
           P.y = p.y - r; P.vy = 0; P.onGround = true; P.plat = p;
           if (p.type === 'crumble' && p.crumbleT < 0) p.crumbleT = 0.9;
-          if (p.beacon && !p.lit) G.lightBeacon(p);
+          if (p.beacon && !p.touched) G.lightBeacon(p, true);
           break;
         }
       }
@@ -173,6 +181,7 @@
     P.lookX = V.damp(P.lookX, P.face, 8, dt);
     P.lookY = V.damp(P.lookY, V.clamp(P.vy / 500, -1, 1), 8, dt);
     P.best = Math.max(P.best, G.meters(P.y));
+    P.peak = Math.max(P.peak, G.meters(P.y));
     for (const tr of P.trail) tr.life -= dt;
     P.trail = P.trail.filter(tr => tr.life > 0);
   };
@@ -263,6 +272,17 @@
     }
     for (const it of T.items) {
       if (it.dead || Math.hypot(P.x - it.x, P.y - it.y) > r + it.a + 4) continue;
+      if (it.type === 'diamond') {
+        if (P.diamonds >= 3) { G.once('diamondsFull', () => T.popup(it.x, it.y - 20, 'DIAMONDS FULL (3/3)', '#9ff3ff')); continue; }
+        it.dead = true;
+        P.diamonds++;
+        T.popup(it.x, it.y - 22, `DIAMOND ${P.diamonds}/3`, '#9ff3ff');
+        T.burst(it.x, it.y, 20, '#bff6ff', 3, 160);
+        V.sfx.heart();
+        G.guide.event('diamond');
+        G.guide.show('diamondGot', 'Diamond! If you die, it brings you back to your last checkpoint. You can hold 3.');
+        continue;
+      }
       if (V.BUFFS[it.type]) { G.tryBuff(it); continue; }
       if (it.type !== 'heart' && it.type !== 'coin') { G.tryPickup(it); continue; }
       it.dead = true;
@@ -280,10 +300,10 @@
 
   // ---------- The rising Void, beacons, zones, wind ----------
   G.updateVoid = dt => {
-    const P = G.P, zi = V.zoneAt(P.best), z = V.ZONES[zi], s = G.surge;
+    const P = G.P, zi = V.zoneAt(P.peak), z = V.ZONES[zi], s = G.surge;
     const frozen = P.buffs.freeze > 0;
     // Stalling makes it hungrier: no new height for ~5 s speeds it up, up to 2x
-    if (P.best > G.lastBest) { G.lastBest = P.best; G.stallT = 0; } else G.stallT += dt;
+    if (P.peak > G.lastBest) { G.lastBest = P.peak; G.stallT = 0; } else G.stallT += dt;
     G.stallMul = 1 + V.clamp((G.stallT - 4) / 5, 0, 1) * 1.2;
     // Surges: a warning, then a few seconds of fast rising. More often the higher you are.
     if (G.voidDelay <= 0 && !frozen && (s.t -= dt) <= 0) {
@@ -307,7 +327,7 @@
     const ramp = 1 + Math.min(P.time / 300, 0.4);
     if (G.voidDelay > 0) G.voidDelay -= dt;
     else if (!frozen) G.voidY -= (z.void * ramp * G.stallMul + (s.phase === 'surge' ? 55 + zi * 12 : 0)) * dt;
-    G.voidY = Math.min(G.voidY, -P.best * M + 700); // it never falls far behind your best height
+    G.voidY = Math.min(G.voidY, -P.peak * M + 700); // never far behind your height since the last respawn
     if (!P.rescue && P.y + R * 0.5 > G.voidY) {
       if (!G.absorbHit()) {
         P.hearts--;
@@ -354,26 +374,36 @@
       G.tower.burst(P.x, P.y + R, 12, '#b98cff', 3, 120);
     }
   };
-  G.lightBeacon = p => {
-    const P = G.P;
-    p.lit = true;
-    G.checkpoint = { x: p.x + p.w / 2, y: p.y, zone: p.zone };
-    if (P.hearts < P.maxHearts) P.hearts++;
-    G.voidY = Math.max(G.voidY, p.y + 600);
-    if (G.surge.phase !== 'calm') {
-      Object.assign(G.surge, { phase: 'calm', t: V.rand(12, 18) });
-      G.tower.popup(p.x + p.w / 2, p.y - 105, 'SURGE STOPPED', '#5fe3ff');
+  // A beacon becomes your checkpoint as soon as you climb past it (touched = false).
+  // Landing on it (touched = true) also gives a heart, pushes the Void back and stops a surge.
+  G.lightBeacon = (p, touched = true) => {
+    const P = G.P, cx = p.x + p.w / 2;
+    const first = !p.lit;
+    if (first) {
+      p.lit = true;
+      G.checkpoint = { x: cx, y: p.y, zone: p.zone };
+      G.tower.burst(cx, p.y - 30, 30, '#5fe3ff', 4, 220);
+      V.sfx.tier();
+      G.once('beacon', () => G.say('ANCIENT SIGNAL', 'Beacons push the Void back for a while. Only for a while.', '#ffd86b'));
     }
-    G.shake = 6;
-    V.sfx.tier();
-    G.tower.burst(p.x + p.w / 2, p.y - 30, 30, '#5fe3ff', 4, 220);
-    G.tower.popup(p.x + p.w / 2, p.y - 80, 'BEACON LIT  +1 HEART', '#5fe3ff');
-    G.once('beacon', () => G.say('ANCIENT SIGNAL', 'Beacons push the Void back for a while. Only for a while.', '#ffd86b'));
+    if (touched && !p.touched) {
+      p.touched = true;
+      if (P.hearts < P.maxHearts) P.hearts++;
+      G.voidY = Math.max(G.voidY, p.y + 600);
+      if (G.surge.phase !== 'calm') {
+        Object.assign(G.surge, { phase: 'calm', t: V.rand(12, 18) });
+        G.tower.popup(cx, p.y - 105, 'SURGE STOPPED', '#5fe3ff');
+      }
+      G.shake = 6;
+    }
+    if (first || touched) G.tower.popup(cx, p.y - 80, touched ? 'CHECKPOINT  +1 HEART' : 'CHECKPOINT SAVED', '#5fe3ff');
   };
   G.updateMeta = dt => {
     const P = G.P, w = G.wind;
     P.time += dt;
-    const zi = V.zoneAt(P.best), z = V.ZONES[zi];
+    // Climbing past a beacon saves it as your checkpoint, even without landing on it
+    for (const p of G.tower.plats) if (p.beacon && !p.lit && P.y < p.y - 40) G.lightBeacon(p, false);
+    const zi = V.zoneAt(P.peak), z = V.ZONES[zi];
     if (zi > P.zone) {
       P.zone = zi;
       G.banner = { text: z.name, sub: `ZONE ${zi + 1}`, t: 2.6 };

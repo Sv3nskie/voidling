@@ -221,6 +221,47 @@
     ctx.restore();
   };
 
+  // Diamond: a revive. Brilliant-cut gem with a twinkle; empty = outline for HUD slots.
+  V.drawDiamond = (ctx, x, y, s, t, empty = false) => {
+    ctx.save();
+    ctx.translate(x, y);
+    const outline = () => {
+      ctx.beginPath();
+      ctx.moveTo(-s, -0.25 * s); ctx.lineTo(-0.55 * s, -0.75 * s); ctx.lineTo(0.55 * s, -0.75 * s);
+      ctx.lineTo(s, -0.25 * s); ctx.lineTo(0, s);
+      ctx.closePath();
+    };
+    if (empty) {
+      outline();
+      ctx.strokeStyle = 'rgba(191,246,255,0.35)'; ctx.lineWidth = Math.max(1, s * 0.12);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    V.drawGlow(ctx, 0, 0, s * 3.2, '#9ff3ff', 0.55 + 0.2 * Math.sin(t * 4));
+    const g = ctx.createLinearGradient(0, -0.75 * s, 0, s);
+    g.addColorStop(0, '#f2fdff'); g.addColorStop(0.35, '#9ff3ff'); g.addColorStop(1, '#2f8fff');
+    outline();
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = Math.max(1, s * 0.07);
+    ctx.beginPath();
+    ctx.moveTo(-s, -0.25 * s); ctx.lineTo(s, -0.25 * s);
+    ctx.moveTo(-0.55 * s, -0.75 * s); ctx.lineTo(-0.3 * s, -0.25 * s); ctx.lineTo(0, -0.75 * s); ctx.lineTo(0.3 * s, -0.25 * s); ctx.lineTo(0.55 * s, -0.75 * s);
+    ctx.moveTo(-0.3 * s, -0.25 * s); ctx.lineTo(0, s); ctx.lineTo(0.3 * s, -0.25 * s);
+    ctx.stroke();
+    const sp = (Math.sin(t * 3) + 1) / 2;
+    ctx.translate(0.55 * s, -0.8 * s);
+    ctx.rotate(t);
+    ctx.fillStyle = `rgba(255,255,255,${0.5 + sp * 0.5})`;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const r = i % 2 ? s * 0.08 : s * (0.25 + sp * 0.15), a = i * Math.PI / 4;
+      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  };
+
   // Checkpoint crystal at the start of each zone
   V.drawBeacon = (ctx, x, y, lit, t) => {
     if (lit) {

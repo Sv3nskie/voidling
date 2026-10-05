@@ -61,7 +61,7 @@
         if (!near(p.x + p.w / 2, p.y)) continue;
         if (p.type === 'crumble') this.show('crumble', 'Cracked platforms crumble right after you land. Keep moving!');
         else if (p.spikes) this.show('spikes', 'Red crystal spikes hurt. Don\'t land on them.');
-        else if (p.beacon && !p.lit) this.show('beacon', 'Touch the beacon to light it: +1 heart, and it pushes the Void back down.');
+        else if (p.beacon && !p.lit) this.show('beacon', 'Beacons are checkpoints. Land on one for +1 heart, and it pushes the Void back down.');
         else if (p.type === 'moving') this.show('moving', 'Moving platforms carry you along. Time your jump.');
         if (this.tip) return;
       }
@@ -71,7 +71,8 @@
       if (this.tip) return;
       for (const it of tower.items) {
         if (it.dead || !near(it.x, it.y)) continue;
-        if (it.type === 'rock') this.show('rock', 'Walk over a rock to pick it up, then press [J] to throw. It auto-aims at the nearest enemy.');
+        if (it.type === 'diamond') this.show('diamond', 'A diamond! Grab it: if you die, it brings you back to your last checkpoint.');
+        else if (it.type === 'rock') this.show('rock', 'Walk over a rock to pick it up, then press [J] to throw. It auto-aims at the nearest enemy.');
         else if (it.type === 'bomb') this.show('bomb', 'Void bomb! The blast launches you too. Throw it near your feet for a huge jump.');
         else if (V.GUNS[it.type]) this.show('gun', 'A gun! Grab it, then hold [J] to shoot. It auto-aims at the nearest enemy.');
         else if (V.BUFFS[it.type]) this.show('buff', 'A power-up! They hide in hard-to-reach spots. Grab it if you can.');
