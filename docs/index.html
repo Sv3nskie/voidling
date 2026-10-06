@@ -55,6 +55,7 @@ body {
   z-index: 5;
 }
 .card {
+  box-sizing: border-box; /* width 100% includes the padding, so a card never runs off a phone screen */
   display: grid; justify-items: center; gap: 14px; text-align: center; max-width: 36rem;
   padding: 28px 24px;
   border-radius: 28px;
@@ -127,6 +128,27 @@ body {
 .shop-item.sel { border-color: var(--gold); box-shadow: 0 0 18px rgba(255, 204, 77, 0.35); }
 .shop-item.off { opacity: 0.45; }
 .shop-item:focus-visible { outline: 3px solid var(--crystal); outline-offset: 2px; }
+/* Phones: a smaller shop with breathing room. Compact item cards: icon on the left, name and
+   price beside it, what it does underneath */
+@media (max-width: 560px) {
+  .screen, .panel { padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom)); }
+  .card { padding: 18px 14px 16px; gap: 10px; border-radius: 22px; }
+  .shop-card { max-width: 26rem; }
+  .shop-title { font-size: 1.25rem; }
+  .shop-card .tag { font-size: 0.88rem; }
+  .shop-coins { font-size: 1rem; }
+  .shop-grid { gap: 8px; }
+  .shop-item {
+    grid-template-columns: 34px minmax(0, 1fr); grid-template-areas: "icon name" "icon price" "desc desc";
+    justify-items: start; align-items: center; column-gap: 8px; row-gap: 1px; text-align: left;
+    padding: 8px 10px 9px; border-radius: 13px;
+  }
+  .shop-item canvas { grid-area: icon; width: 34px; height: 34px; }
+  .shop-item strong { grid-area: name; font-size: 0.74rem; }
+  .shop-item em { grid-area: price; font-size: 0.74rem; }
+  .shop-item span { grid-area: desc; font-size: 0.72rem; line-height: 1.2; margin-top: 4px; text-wrap: pretty; }
+  .shop-card .play { font-size: 1rem; padding: 12px 30px; box-shadow: 0 5px 0 #b8741a, 0 0 22px rgba(255, 204, 77, 0.4); }
+}
 .rules { display: grid; gap: 8px; margin: 2px 0 4px; padding: 0; list-style: none; text-align: left; font-size: 1rem; color: var(--muted); }
 .rules li { display: flex; align-items: center; gap: 12px; }
 .rules b { color: var(--ink); font-weight: 600; }
@@ -334,6 +356,23 @@ body.touch .only-keys { display: none !important; }
 .panel-title { margin: 0; font: 400 clamp(1.5rem, 5vw, 2.1rem)/1 var(--font-display); color: var(--ink); text-shadow: 0 0 18px rgba(185, 140, 255, 0.7); }
 .panel .menu-list { margin-inline-start: 0; justify-items: center; }
 .panel .menu-item.sel { transform: scale(1.05); }
+/* Phones: lighter settings rows with thin dividers, no keyboard highlight (you tap them) */
+@media (max-width: 560px) {
+  .panel-card { max-width: 24rem; }
+  .panel-title { font-size: 1.4rem; }
+  .settings { gap: 0; }
+  .settings .opt { font-size: 0.86rem; padding: 13px 6px 13px 10px; border-radius: 0; border-bottom: 1px solid rgba(185, 140, 255, 0.14); }
+  .settings .opt b { font-size: 0.7rem; padding: 5px 9px; }
+  .settings [data-back] { font-size: 1rem; margin-top: 10px; }
+}
+@media (pointer: coarse) {
+  .settings .opt { color: var(--ink); }
+  .settings .menu-item.sel { background: none; }
+  .settings .menu-item::before { display: none; }
+}
+body.touch .settings .opt { color: var(--ink); }
+body.touch .settings .menu-item.sel { background: none; }
+body.touch .settings .menu-item::before { display: none; }
 .settings { width: 100%; justify-items: stretch !important; }
 .settings .opt { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: clamp(1rem, 2.6vw, 1.2rem); }
 .settings .opt b {
@@ -460,7 +499,7 @@ body.touch .only-keys { display: none !important; }
     <p class="shop-coins" id="shopCoins"></p>
     <div class="shop-grid" id="shopGrid"></div>
     <button class="play" id="shopClose" type="button">Keep climbing</button>
-    <p class="best">Arrows choose · Space buys · Esc leaves</p>
+    <p class="best only-keys">Arrows choose · Space buys · Esc leaves</p>
   </div>
 </section>
 

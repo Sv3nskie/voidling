@@ -6,6 +6,7 @@
   const BEACON_DEPTH = 90, BEACON_W = 170;
   // Diamonds and trading posts are extras layered on top of the level, with their own seed
   const EXTRAS_SEED = TOWER_SEED * 3 + 101, EXTRAS_LAG = 450;
+  const CP_GAP = 80, CP_END = 35; // checkpoint spacing (m), and no checkpoint this close below a zone beacon
   const M = (V.M = 10);        // world units per meter
 
   // Difficulty per zone. gap = vertical distance between platforms, w = platform width.
@@ -393,7 +394,8 @@
           this.xrng = V.rng(EXTRAS_SEED + r.zi * 911);
           this.diamondDue = V.ZONES[r.zi].at + 30 + this.xrng() * 25;
           this.shopDue = V.ZONES[r.zi].at + 100;
-          this.cpDue = V.ZONES[r.zi].at + 50;
+          // first checkpoint ~95 m above the zone's beacon (the zone's first row); 50 m in the canyon
+          this.cpDue = r.zi === 0 ? 50 : (r.p.beacon ? -r.y / M : V.ZONES[r.zi].at) + CP_GAP;
         }
         const prev = V.random;
         V.random = this.xrng;
@@ -418,22 +420,23 @@
         }
       }
       if (!p.beacon && !p.shop && m >= this.diamondDue && this.placeDiamond(r)) this.diamondDue = m + V.rand(70, 110);
-      // Checkpoints between the zone beacons, all the way up: at 50, 150, 250 m ... into each
-      // zone the first solid island that's wide enough becomes one. If none comes within 30 m,
-      // the next island that isn't moving takes it, even a narrow one, and a crumbling one is
-      // made solid (a checkpoint must be safe). No island is added or moved and no random
+      // Checkpoints between the zone beacons, all the way up, about CP_GAP m apart (counted from
+      // the last checkpoint or zone beacon), and never within CP_END m below the next zone's
+      // beacon. The first solid island that's wide enough becomes one. If none comes within
+      // 30 m, the next island that isn't moving takes it, even a narrow one, and a crumbling one
+      // is made solid (a checkpoint must be safe). No island is added or moved and no random
       // numbers are used, so the shops and diamonds stay exactly where they were.
-      if (!p.beacon && m >= this.cpDue && this.cpDue < nextZone - 40) {
+      if (!p.beacon && m >= this.cpDue && m < nextZone - CP_END) {
         const late = m >= this.cpDue + 30, ok = q => !q.beacon && !q.shop && !q.extra && q.type === 'solid' && q.w >= 60;
-        // this row's island, else a solid side island next to it, else (late) this row's island
-        // even if it's narrow or crumbling
-        let host = !r.jelly && ok(p) ? p : this.plats.find(q => q !== p && ok(q) && Math.abs(q.y - r.y) < 45);
-        if (!host && late && !r.jelly && !p.shop && p.type !== 'moving' && r.w >= 44) host = p;
+        // this row's island (also one you reach off a jelly), else a solid side island next to
+        // it, else (late) this row's island even if it's narrow or crumbling
+        let host = ok(p) ? p : this.plats.find(q => q !== p && ok(q) && Math.abs(q.y - r.y) < 45);
+        if (!host && late && !p.shop && p.type !== 'moving' && r.w >= 44) host = p;
         if (host) {
           if (host.type === 'crumble') { host.type = 'solid'; host.cracks = null; }
           host.beacon = true; host.midCp = true; host.spikes = null;
           for (const e of this.enemies) if (e.plat === host || e.island === host) e.dead = true; // a safe place to come back to
-          while (this.cpDue <= -host.y / M) this.cpDue += 100;
+          this.cpDue = -host.y / M + CP_GAP;
         }
       }
     }
